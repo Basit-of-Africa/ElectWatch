@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Report, Incident } from '../types';
+import { Report, Incident, User as AppUser } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { 
@@ -33,13 +33,43 @@ import {
   Activity,
   Zap
 } from 'lucide-react';
-import { formatDistanceToNow, subDays, startOfDay, isSameDay, format } from 'date-fns';
+import { formatDistanceToNow, subDays, isSameDay, format } from 'date-fns';
 import { motion } from 'motion/react';
+
+const timestampToDate = (value: unknown) => {
+  if (!value) return null;
+  if (typeof value === 'object' && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getRegionFromPollingUnit = (pollingUnitId?: string) => {
+  if (!pollingUnitId) return 'Unassigned';
+  const parts = pollingUnitId.split('-').filter(Boolean);
+  return parts.length >= 2 ? `${parts[0]}-${parts[1]}` : parts[0] || 'Unknown';
+};
+
+const formatLatestSync = (reports: Report[]) => {
+  const latest = reports.map(report => timestampToDate(report.timestamp)).filter(Boolean)[0];
+  return latest ? formatDistanceToNow(latest, { addSuffix: true }) : 'No reports';
+};
+
+const getSystemLoad = (openCases: number, totalReports: number) => {
+  if (totalReports === 0) return 'No Traffic';
+  const pressure = openCases / totalReports;
+  if (pressure >= 0.4) return 'High';
+  if (pressure >= 0.15) return 'Moderate';
+  return 'Low';
+};
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [observers, setObservers] = useState<AppUser[]>([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [stats, setStats] = useState({
     total: 0,
     incidents: 0,
@@ -84,11 +114,31 @@ export default function Dashboard() {
       handleFirestoreError(error, OperationType.LIST, 'incidents');
     });
 
+    const usersQ = query(collection(db, 'users'), where('role', '==', 'observer'));
+    const unsubscribeUsers = onSnapshot(usersQ, (snapshot) => {
+      setObservers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as AppUser)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+    });
+
     return () => {
       unsubscribeReports();
       unsubscribeIncidents();
+      unsubscribeUsers();
     };
   }, [user, isAdmin, isSupervisor]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const severityData = incidents.reduce((acc, curr) => {
     acc[curr.severity] = (acc[curr.severity] || 0) + 1;
@@ -104,21 +154,28 @@ export default function Dashboard() {
 
   const totalIncidents = pieChartData.reduce((acc, curr) => acc + curr.value, 0);
 
-  // Group by "Region" (simulated by PU ID prefix)
   const regionalPerformance = reports.reduce((acc, curr) => {
-    const region = curr.pollingUnitId.split('-')[0] || 'Unknown';
+    const region = getRegionFromPollingUnit(curr.pollingUnitId);
     acc[region] = (acc[region] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   const regionalData = Object.entries(regionalPerformance).map(([name, value]) => ({ name, value })).slice(0, 5);
+  const assignedRegion = getRegionFromPollingUnit(user?.assignedPollingUnitId);
+  const openCases = incidents.filter(i => i.status !== 'resolved').length;
+  const observerSubmittedReports = reports.filter(report => report.observerId === user?.uid).length;
+  const lastSyncLabel = formatLatestSync(reports);
+  const systemLoad = getSystemLoad(openCases, stats.total);
+  const systemCapacity = Math.min(100, Math.round((stats.total / Math.max(stats.total + openCases, 1)) * 100));
+  const observerCoverage = stats.total > 0 ? Math.round((observerSubmittedReports / stats.total) * 100) : 0;
 
   // Trending Data for Last 7 Days
   const trendData = Array.from({ length: 7 }).map((_, i) => {
     const date = subDays(new Date(), 6 - i);
     const dayIncidents = incidents.filter(inc => {
       if (!inc.timestamp) return false;
-      const incDate = (inc.timestamp as any)?.toDate ? (inc.timestamp as any).toDate() : new Date(inc.timestamp);
+      const incDate = timestampToDate(inc.timestamp);
+      if (!incDate) return false;
       return isSameDay(incDate, date);
     });
 
@@ -158,6 +215,24 @@ export default function Dashboard() {
     </motion.div>
   );
 
+  const SeverityTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+
+    const item = payload[0].payload;
+    const percentage = totalIncidents > 0 ? Math.round((item.value / totalIncidents) * 100) : 0;
+
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-xl p-4 min-w-[150px]">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+          <p className="text-xs font-black text-gray-900 uppercase tracking-widest">{item.name}</p>
+        </div>
+        <p className="text-sm font-bold text-gray-700">{item.value} incident{item.value === 1 ? '' : 's'}</p>
+        <p className="text-xs font-semibold text-gray-400">{percentage}% of total</p>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-12">
       {/* Header */}
@@ -187,10 +262,10 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-3 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm w-fit">
            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl text-sm">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             Live Sync
+             <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+             {isOnline ? 'Live Sync' : 'Offline Queue'}
            </div>
-           <p className="text-gray-400 text-[10px] font-mono px-4 uppercase tracking-widest">Active Connection</p>
+           <p className="text-gray-400 text-[10px] font-mono px-4 uppercase tracking-widest">{lastSyncLabel}</p>
         </div>
       </div>
 
@@ -210,13 +285,13 @@ export default function Dashboard() {
         />
         <StatCard 
           title={isAdmin || isSupervisor ? "Open Cases" : "PU Status"} 
-          value={isAdmin || isSupervisor ? incidents.filter(i => i.status !== 'resolved').length : (user as any)?.assignedPollingUnitId || 'PU-882'} 
+          value={isAdmin || isSupervisor ? openCases : user?.assignedPollingUnitId || 'Unassigned'} 
           icon={isAdmin || isSupervisor ? Zap : MapPin} 
           color={{ bg: 'bg-amber-50', text: 'text-amber-600' }} 
         />
         <StatCard 
           title="System Vitality" 
-          value="Active" 
+          value={isOnline ? 'Active' : 'Offline'} 
           icon={Activity} 
           color={{ bg: 'bg-emerald-50', text: 'text-emerald-600' }} 
         />
@@ -298,32 +373,34 @@ export default function Dashboard() {
                    <Activity className="text-emerald-600 w-5 h-5" />
                    System Infrastructure Health
                  </h3>
-                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">Global Status: Nominal</span>
+                 <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${isOnline ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+                   Global Status: {isOnline ? 'Online' : 'Offline'}
+                 </span>
                </div>
                <div className="grid grid-cols-3 gap-8">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Observers</p>
-                    <p className="text-2xl font-bold text-gray-900 tabular-nums">1,204</p>
+                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{observers.length}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">DB Throughput</p>
-                    <p className="text-2xl font-bold text-gray-900 tabular-nums">14ms</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Sync</p>
+                    <p className="text-2xl font-bold text-gray-900 tabular-nums">{lastSyncLabel}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Network Load</p>
-                    <p className="text-2xl font-bold text-gray-900">Low - Stable</p>
+                    <p className="text-2xl font-bold text-gray-900">{systemLoad}</p>
                   </div>
                </div>
                <div className="mt-10 h-2.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100">
                  <motion.div 
                    initial={{ width: 0 }}
-                   animate={{ width: '85%' }}
+                   animate={{ width: `${systemCapacity}%` }}
                    className="h-full bg-emerald-500 rounded-full" 
                  />
                </div>
                <p className="text-[10px] text-gray-400 mt-4 font-medium flex justify-between uppercase tracking-tight">
-                 <span>Operational efficiency targeting 99.9% uptime</span>
-                 <span>85% capacity utilized</span>
+                 <span>{openCases} open cases across {stats.total} tracked reports</span>
+                 <span>{systemCapacity}% current clearance ratio</span>
                </p>
             </div>
 
@@ -401,7 +478,7 @@ export default function Dashboard() {
                     <Pie data={pieChartData} innerRadius={45} outerRadius={65} dataKey="value" paddingAngle={5}>
                       {pieChartData.map((entry, index) => <Cell key={`c-${index}`} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip content={<SeverityTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -428,8 +505,8 @@ export default function Dashboard() {
                      <div className="p-6 bg-emerald-900/50 rounded-[32px] border border-emerald-800/50">
                         <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-4 font-mono">Dominant Zone</h4>
                         <div className="flex items-center gap-4">
-                           <div className="text-3xl font-bold font-serif uppercase tracking-tighter truncate">{regionalData[0]?.name || 'Sector A'}</div>
-                           <span className="text-[10px] font-bold bg-emerald-500/20 px-2 py-1 rounded-lg border border-emerald-500/30">Stable</span>
+                           <div className="text-3xl font-bold font-serif uppercase tracking-tighter truncate">{regionalData[0]?.name || assignedRegion}</div>
+                           <span className="text-[10px] font-bold bg-emerald-500/20 px-2 py-1 rounded-lg border border-emerald-500/30">{systemLoad}</span>
                         </div>
                      </div>
                      <div className="p-6 bg-emerald-900/50 rounded-[32px] border border-emerald-800/50">
@@ -531,11 +608,11 @@ export default function Dashboard() {
                   <div className="pt-6 flex flex-wrap gap-4">
                     <div className="px-8 py-5 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
                       <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mb-1 font-mono">My Sector</p>
-                      <p className="font-bold text-xl tracking-tight">Zone LW-01</p>
+                      <p className="font-bold text-xl tracking-tight">{assignedRegion}</p>
                     </div>
                     <div className="px-8 py-5 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
                       <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mb-1 font-mono">Transmission Status</p>
-                      <p className="font-bold text-xl tracking-tight">Optimal</p>
+                      <p className="font-bold text-xl tracking-tight">{isOnline ? 'Online' : 'Queued'}</p>
                     </div>
                   </div>
                 </div>
@@ -545,31 +622,31 @@ export default function Dashboard() {
               {/* Observer Performance */}
               <div className="grid md:grid-cols-2 gap-8">
                   <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm relative group overflow-hidden">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 font-mono">Submission Accuracy</h3>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 font-mono">Submission Coverage</h3>
                     <div className="flex items-end gap-3">
-                       <p className="text-5xl font-bold text-gray-900 font-serif tabular-nums tracking-tighter">98.4<span className="text-2xl font-sans text-gray-400">%</span></p>
+                       <p className="text-5xl font-bold text-gray-900 font-serif tabular-nums tracking-tighter">{observerCoverage}<span className="text-2xl font-sans text-gray-400">%</span></p>
                        <span className="text-emerald-600 text-xs font-bold mb-2 flex items-center gap-1">
-                         <TrendingUp className="w-3 h-3" /> +2%
+                         <TrendingUp className="w-3 h-3" /> {observerSubmittedReports} filed
                        </span>
                     </div>
                     <div className="w-full bg-gray-50 h-2 rounded-full mt-8 overflow-hidden">
                        <motion.div 
                          initial={{ width: 0 }}
-                         animate={{ width: '98.4%' }}
+                         animate={{ width: `${observerCoverage}%` }}
                          className="bg-emerald-500 h-full rounded-full" 
                        />
                     </div>
                   </div>
                   <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 font-mono">Network Latency</h3>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 font-mono">Last Transmission</h3>
                     <div className="flex items-end gap-3">
-                       <p className="text-5xl font-bold text-gray-900 font-serif tabular-nums tracking-tighter">4.2<span className="text-2xl font-sans text-gray-400">ms</span></p>
-                       <span className="text-indigo-500 text-xs font-bold mb-2 tracking-widest uppercase">Verified</span>
+                       <p className="text-3xl font-bold text-gray-900 font-serif tabular-nums tracking-tighter">{lastSyncLabel}</p>
+                       <span className="text-indigo-500 text-xs font-bold mb-2 tracking-widest uppercase">{isOnline ? 'Synced' : 'Queued'}</span>
                     </div>
                     <div className="w-full bg-gray-50 h-2 rounded-full mt-8 overflow-hidden">
                        <motion.div 
                          initial={{ width: 0 }}
-                         animate={{ width: '85%' }}
+                         animate={{ width: isOnline ? '100%' : '35%' }}
                          className="bg-indigo-500 h-full rounded-full" 
                        />
                     </div>
@@ -596,7 +673,7 @@ export default function Dashboard() {
               <div className="mt-12 p-8 bg-emerald-50/50 rounded-[32px] border border-emerald-100/50">
                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-2 font-mono">Assigned Region Hub</p>
                  <p className="font-bold text-emerald-950 flex items-center gap-2 italic">
-                   <MapPin className="w-4 h-4" /> Lagos West Sector
+                   <MapPin className="w-4 h-4" /> {assignedRegion}
                  </p>
               </div>
             </div>
@@ -652,7 +729,7 @@ export default function Dashboard() {
                        report.payload?.description || JSON.stringify(report.payload).slice(0, 80)}
                     </p>
                     <div className="mt-4 flex items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg"><MapPin className="w-3.5 h-3.5" /> Region 8A</span>
+                      <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg"><MapPin className="w-3.5 h-3.5" /> {getRegionFromPollingUnit(report.pollingUnitId)}</span>
                       <span className="w-1 h-1 bg-gray-200 rounded-full" />
                       <span className="text-emerald-600">ID: {report.id.slice(0, 8)}</span>
                     </div>

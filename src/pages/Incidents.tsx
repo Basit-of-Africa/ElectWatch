@@ -22,6 +22,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+const csvCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
 export default function Incidents() {
   const { isAdmin } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -32,16 +34,19 @@ export default function Incidents() {
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const exportToCSV = () => {
-    const headers = ['ID', 'Polling Unit', 'Severity', 'Status', 'Description', 'Timestamp'];
+    if (!isAdmin) return;
+
+    const headers = ['ID', 'Report ID', 'Polling Unit', 'Severity', 'Status', 'Description', 'Timestamp'];
     const csvContent = [
       headers.join(','),
       ...filteredIncidents.map(i => [
-        i.id,
-        i.pollingUnitId,
-        i.severity,
-        i.status,
-        `"${i.description.replace(/"/g, '""')}"`,
-        (i.timestamp as any)?.toDate ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+        csvCell(i.id),
+        csvCell(i.reportId),
+        csvCell(i.pollingUnitId),
+        csvCell(i.severity),
+        csvCell(i.status),
+        csvCell(i.description),
+        csvCell((i.timestamp as any)?.toDate ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A')
       ].join(','))
     ].join('\n');
 
@@ -58,12 +63,17 @@ export default function Incidents() {
   };
 
   const exportToPDF = () => {
+    if (!isAdmin) return;
+
     const doc = new jsPDF();
-    doc.text('Election Incident Report', 14, 15);
+    doc.text('Election Incident Export', 14, 15);
     doc.setFontSize(10);
     doc.text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, 22);
+    doc.text(`Records: ${filteredIncidents.length}`, 14, 28);
     
     const tableData = filteredIncidents.map(i => [
+      i.id.substring(0, 8),
+      i.reportId.substring(0, 8),
       i.pollingUnitId,
       i.severity.toUpperCase(),
       i.status.toUpperCase(),
@@ -72,9 +82,9 @@ export default function Incidents() {
     ]);
 
     autoTable(doc, {
-      head: [['PU', 'Severity', 'Status', 'Description', 'Timestamp']],
+      head: [['Incident', 'Report', 'PU', 'Severity', 'Status', 'Description', 'Timestamp']],
       body: tableData,
-      startY: 30,
+      startY: 36,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [4, 120, 87] }
     });
@@ -164,42 +174,43 @@ export default function Incidents() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
-          {/* Export Button */}
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
-            >
-              <Download className="w-4 h-4 text-emerald-600" />
-              Export
-            </button>
-            
-            <AnimatePresence>
-              {showExportMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
-                >
-                  <button
-                    onClick={exportToCSV}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+          {isAdmin && (
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
+              >
+                <Download className="w-4 h-4 text-emerald-600" />
+                Export
+              </button>
+              
+              <AnimatePresence>
+                {showExportMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
                   >
-                    <TableIcon className="w-4 h-4 text-emerald-600" />
-                    Export to CSV
-                  </button>
-                  <button
-                    onClick={exportToPDF}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
-                  >
-                    <FileText className="w-4 h-4 text-emerald-600" />
-                    Export to PDF
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                    <button
+                      onClick={exportToCSV}
+                      className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+                    >
+                      <TableIcon className="w-4 h-4 text-emerald-600" />
+                      Export to CSV
+                    </button>
+                    <button
+                      onClick={exportToPDF}
+                      className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      Export to PDF
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {/* Status Filter */}
           <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
@@ -287,51 +298,53 @@ export default function Incidents() {
                       </div>
                     </div>
 
-                    {isAdmin && (
-                      <div className="flex md:flex-col justify-end gap-2 border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-8 min-w-[180px]">
-                        <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest mb-2 hidden md:block">Update Status</p>
-                        <button
-                          onClick={() => handleStatusUpdate(incident.id, 'investigating')}
-                          disabled={incident.status === 'investigating'}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                            incident.status === 'investigating' 
-                              ? 'bg-orange-50 text-orange-600 border border-orange-100 shadow-sm shadow-orange-500/10' 
-                              : 'text-gray-500 hover:bg-orange-50 hover:text-orange-600'
-                          }`}
-                        >
-                          Investigating
-                        </button>
-                        <button
-                          onClick={() => handleStatusUpdate(incident.id, 'resolved')}
-                          disabled={incident.status === 'resolved'}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                            incident.status === 'resolved' 
-                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm shadow-emerald-500/10' 
-                              : 'text-gray-500 hover:bg-emerald-50 hover:text-emerald-600'
-                          }`}
-                        >
-                          Resolve Issue
-                        </button>
-                        <button
-                          onClick={() => handleStatusUpdate(incident.id, 'pending')}
-                          disabled={incident.status === 'pending'}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                            incident.status === 'pending' 
-                              ? 'bg-amber-50 text-amber-600 border border-amber-100 shadow-sm shadow-amber-500/10' 
-                              : 'text-gray-500 hover:bg-amber-50 hover:text-amber-600'
-                          }`}
-                        >
-                          Back to Pending
-                        </button>
-                        
-                        <Link 
-                          to={`/app/incidents/${incident.id}`}
-                          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gray-50 text-emerald-700 hover:bg-emerald-50 mt-2 transition-all border border-gray-100"
-                        >
-                          View Full Details <ChevronRight className="w-3 h-3" />
-                        </Link>
-                      </div>
-                    )}
+                    <div className="flex md:flex-col justify-end gap-2 border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-8 min-w-[180px]">
+                      {isAdmin && (
+                        <>
+                          <p className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest mb-2 hidden md:block">Update Status</p>
+                          <button
+                            onClick={() => handleStatusUpdate(incident.id, 'investigating')}
+                            disabled={incident.status === 'investigating'}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                              incident.status === 'investigating' 
+                                ? 'bg-orange-50 text-orange-600 border border-orange-100 shadow-sm shadow-orange-500/10' 
+                                : 'text-gray-500 hover:bg-orange-50 hover:text-orange-600'
+                            }`}
+                          >
+                            Investigating
+                          </button>
+                          <button
+                            onClick={() => handleStatusUpdate(incident.id, 'resolved')}
+                            disabled={incident.status === 'resolved'}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                              incident.status === 'resolved' 
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm shadow-emerald-500/10' 
+                                : 'text-gray-500 hover:bg-emerald-50 hover:text-emerald-600'
+                            }`}
+                          >
+                            Resolve Issue
+                          </button>
+                          <button
+                            onClick={() => handleStatusUpdate(incident.id, 'pending')}
+                            disabled={incident.status === 'pending'}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                              incident.status === 'pending' 
+                                ? 'bg-amber-50 text-amber-600 border border-amber-100 shadow-sm shadow-amber-500/10' 
+                                : 'text-gray-500 hover:bg-amber-50 hover:text-amber-600'
+                            }`}
+                          >
+                            Back to Pending
+                          </button>
+                        </>
+                      )}
+                      
+                      <Link 
+                        to={`/app/incidents/${incident.id}`}
+                        className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gray-50 text-emerald-700 hover:bg-emerald-50 mt-2 transition-all border border-gray-100"
+                      >
+                        View Full Details <ChevronRight className="w-3 h-3" />
+                      </Link>
+                    </div>
                   </div>
                 </motion.div>
               ))}

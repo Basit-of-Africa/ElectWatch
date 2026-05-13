@@ -7,6 +7,7 @@ import PublicDashboard from './pages/PublicDashboard';
 import Dashboard from './pages/Dashboard';
 import Report from './pages/Report';
 import Reports from './pages/Reports';
+import FieldReportsFeed from './pages/FieldReportsFeed';
 import EditReport from './pages/EditReport';
 import Incidents from './pages/Incidents';
 import IncidentDetail from './pages/IncidentDetail';
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route path="map" element={<MapPage />} />
         <Route path="report" element={<Report />} />
         <Route path="reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+        <Route path="field-reports" element={<ProtectedRoute><FieldReportsFeed /></ProtectedRoute>} />
         <Route path="reports/:id/edit" element={<ProtectedRoute adminOnly><EditReport /></ProtectedRoute>} />
         <Route path="incidents" element={<Incidents />} />
         <Route path="incidents/:id" element={<IncidentDetail />} />

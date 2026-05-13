@@ -12,7 +12,8 @@ import {
   Vote,
   Map as MapIcon,
   Wifi,
-  WifiOff
+  WifiOff,
+  Radio
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,6 +50,7 @@ export default function Layout() {
     { name: 'Incident Map', href: '/app/map', icon: MapIcon },
     // Administrators and supervisors can see all reports
     ...(isAdmin || isSupervisor ? [{ name: 'Reports', href: '/app/reports', icon: FileText }] : []),
+    ...(isAdmin || isSupervisor ? [{ name: 'Field Feed', href: '/app/field-reports', icon: Radio }] : []),
     // Only common observers and admins can submit reports in this model
     ...(!isSupervisor ? [{ name: 'Report', href: '/app/report', icon: FilePlus }] : []),
     { name: 'Incidents', href: '/app/incidents', icon: AlertTriangle },
