@@ -41,8 +41,13 @@ function normalizeSpecialId(value: string) {
   return value.trim().toUpperCase();
 }
 
+function getDemoUser(specialId: string) {
+  return demoUsers[specialId] || null;
+}
+
 async function findUserBySpecialId(specialId: string): Promise<Omit<User, 'uid' | 'createdAt'> | null> {
-  if (demoUsers[specialId]) return demoUsers[specialId];
+  const demoUser = getDemoUser(specialId);
+  if (demoUser) return demoUser;
 
   const directSnap = await getDoc(doc(db, 'users', specialId));
   if (directSnap.exists()) {
@@ -77,15 +82,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const specialId = normalizeSpecialId(rawSpecialId);
     if (!specialId) throw new Error('Enter your special ID.');
 
-    const credential = auth.currentUser || (await signInAnonymously(auth)).user;
     const profile = await findUserBySpecialId(specialId);
     if (!profile) {
       await signOut(auth);
       throw new Error('Special ID not recognized.');
     }
 
+    const demoUser = getDemoUser(specialId);
+    let uid = demoUser ? `demo-${specialId.toLowerCase()}` : auth.currentUser?.uid;
+    let credential: FirebaseUser | null = auth.currentUser;
+
+    try {
+      credential = auth.currentUser || (await signInAnonymously(auth)).user;
+      uid = credential.uid;
+    } catch (error) {
+      if (!demoUser) throw error;
+      console.warn('Firebase anonymous sign-in unavailable; using local demo session.', error);
+    }
+
     const sessionUser: User = {
-      uid: credential.uid,
+      uid,
       displayName: profile.displayName,
       email: profile.email || `${specialId.toLowerCase()}@civicwatch.local`,
       role: profile.role as UserRole,
@@ -93,10 +109,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
     };
 
-    await setDoc(doc(db, 'users', credential.uid), sessionUser, { merge: true });
+    if (credential) {
+      try {
+        await setDoc(doc(db, 'users', credential.uid), sessionUser, { merge: true });
+      } catch (error) {
+        if (!demoUser) throw error;
+        console.warn('Demo profile could not be written to Firestore; continuing with local session.', error);
+      }
+    }
 
     localStorage.setItem(SESSION_ID_KEY, specialId);
-    setFirebaseUser(credential);
+    setFirebaseUser(credential || null);
     setUser(sessionUser);
   };
 
@@ -104,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem(SESSION_ID_KEY);
     setUser(null);
     setFirebaseUser(null);
-    await signOut(auth);
+    if (auth.currentUser) await signOut(auth);
   };
 
   useEffect(() => {
