@@ -7,6 +7,8 @@ import { Link } from 'react-router-dom';
 import { 
   BarChart, 
   Bar, 
+  LineChart,
+  Line,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -31,7 +33,7 @@ import {
   Activity,
   Zap
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, subDays, startOfDay, isSameDay, format } from 'date-fns';
 import { motion } from 'motion/react';
 
 export default function Dashboard() {
@@ -74,7 +76,7 @@ export default function Dashboard() {
       handleFirestoreError(error, OperationType.LIST, 'reports');
     });
 
-    const incidentsQ = query(collection(db, 'incidents'), orderBy('timestamp', 'desc'), limit(10));
+    const incidentsQ = query(collection(db, 'incidents'), orderBy('timestamp', 'desc'), limit(100));
     const unsubscribeIncidents = onSnapshot(incidentsQ, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Incident));
       setIncidents(docs);
@@ -110,6 +112,24 @@ export default function Dashboard() {
   }, {} as Record<string, number>);
 
   const regionalData = Object.entries(regionalPerformance).map(([name, value]) => ({ name, value })).slice(0, 5);
+
+  // Trending Data for Last 7 Days
+  const trendData = Array.from({ length: 7 }).map((_, i) => {
+    const date = subDays(new Date(), 6 - i);
+    const dayIncidents = incidents.filter(inc => {
+      if (!inc.timestamp) return false;
+      const incDate = inc.timestamp instanceof Object ? (inc.timestamp as any).toDate() : new Date(inc.timestamp);
+      return isSameDay(incDate, date);
+    });
+
+    return {
+      name: format(date, 'MMM dd'),
+      low: dayIncidents.filter(inc => inc.severity === 'low').length,
+      medium: dayIncidents.filter(inc => inc.severity === 'medium').length,
+      high: dayIncidents.filter(inc => inc.severity === 'high').length,
+      critical: dayIncidents.filter(inc => inc.severity === 'critical').length,
+    };
+  });
 
   const chartData = [
     { name: 'Incidents', value: stats.incidents, color: '#ef4444' },
@@ -208,6 +228,49 @@ export default function Dashboard() {
         {/* Admin View: System Health & Global Analytics */}
         {isAdmin && (
           <>
+            <div className="lg:col-span-3 bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
+               <div className="flex justify-between items-center mb-10">
+                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif italic text-emerald-950">
+                   <TrendingUp className="text-emerald-600 w-5 h-5" />
+                   Incident Severity Trends (Last 7 Days)
+                 </h3>
+                 <div className="flex gap-4">
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">Low</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-amber-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">Medium</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-orange-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">High</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-red-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">Critical</span>
+                   </div>
+                 </div>
+               </div>
+               <div className="h-[300px] w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                   <LineChart data={trendData}>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                     <Tooltip 
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
+                     />
+                     <Line type="monotone" dataKey="low" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                     <Line type="monotone" dataKey="medium" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                     <Line type="monotone" dataKey="high" stroke="#f97316" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                     <Line type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                   </LineChart>
+                 </ResponsiveContainer>
+               </div>
+            </div>
+
             <div className="lg:col-span-2 bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
                <div className="flex justify-between items-start mb-10">
                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif italic">
@@ -328,6 +391,49 @@ export default function Dashboard() {
         {/* Supervisor View: Regional Intelligence */}
         {isSupervisor && !isAdmin && (
           <>
+            <div className="lg:col-span-3 bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm mb-8">
+               <div className="flex justify-between items-center mb-10">
+                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif italic text-emerald-950">
+                   <TrendingUp className="text-emerald-600 w-5 h-5" />
+                   Regional Incident Severity Trends
+                 </h3>
+                 <div className="flex gap-4">
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">Low</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-amber-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">Medium</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-orange-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">High</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <div className="w-3 h-3 rounded-full bg-red-500" />
+                     <span className="text-[10px] font-bold text-gray-400 uppercase">Critical</span>
+                   </div>
+                 </div>
+               </div>
+               <div className="h-[250px] w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                   <LineChart data={trendData}>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                     <Tooltip 
+                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
+                     />
+                     <Line type="monotone" dataKey="low" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                     <Line type="monotone" dataKey="medium" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                     <Line type="monotone" dataKey="high" stroke="#f97316" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                     <Line type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                   </LineChart>
+                 </ResponsiveContainer>
+               </div>
+            </div>
+
             <div className="lg:col-span-2 bg-emerald-950 rounded-[40px] p-10 text-white shadow-2xl relative overflow-hidden">
                <div className="relative z-10 space-y-8">
                   <div className="flex justify-between items-start">
