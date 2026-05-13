@@ -9,6 +9,7 @@ import Reports from './pages/Reports';
 import EditReport from './pages/EditReport';
 import Incidents from './pages/Incidents';
 import IncidentDetail from './pages/IncidentDetail';
+import MapPage from './pages/MapPage';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -34,6 +35,7 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="map" element={<MapPage />} />
         <Route path="report" element={<Report />} />
         <Route path="reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
         <Route path="reports/:id/edit" element={<ProtectedRoute adminOnly><EditReport /></ProtectedRoute>} />

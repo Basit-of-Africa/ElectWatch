@@ -16,10 +16,13 @@ import {
   History,
   Calendar,
   MessageSquare,
-  Edit2
+  Edit2,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { summarizeIncident } from '../services/geminiService';
 
 interface IncidentHistory {
   id: string;
@@ -37,6 +40,8 @@ export default function IncidentDetail() {
   const [observer, setObserver] = useState<User | null>(null);
   const [history, setHistory] = useState<IncidentHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -99,6 +104,19 @@ export default function IncidentDetail() {
     }
   };
 
+  const handleGenerateAiSummary = async () => {
+    if (!incident) return;
+    setIsAiLoading(true);
+    try {
+      const summary = await summarizeIncident(incident.description, incident.severity);
+      setAiSummary(summary);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center h-screen">Loading incident details...</div>;
   if (!incident) return <div className="p-20 text-center">Incident not found.</div>;
 
@@ -154,6 +172,51 @@ export default function IncidentDetail() {
                 {incident.description}
               </p>
             </div>
+
+            <AnimatePresence>
+              {aiSummary && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-emerald-950 text-white rounded-[32px] p-8 relative overflow-hidden group"
+                >
+                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                    <Sparkles className="w-20 h-20" />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 text-emerald-400 mb-4">
+                      <Zap className="w-5 h-5 fill-current" />
+                      <span className="text-xs font-bold uppercase tracking-[0.2em] font-mono">AI Security Analysis</span>
+                    </div>
+                    <div className="prose prose-invert prose-sm">
+                      <p className="text-emerald-50/90 whitespace-pre-wrap font-medium leading-relaxed">
+                        {aiSummary}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {!aiSummary && (
+              <button 
+                onClick={handleGenerateAiSummary}
+                disabled={isAiLoading}
+                className="w-full py-4 border-2 border-emerald-100 rounded-3xl text-emerald-700 font-bold flex items-center justify-center gap-2 hover:bg-emerald-50 transition-all disabled:opacity-50"
+              >
+                {isAiLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+                    Analyzing Situation...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate AI Incident Summary
+                  </>
+                )}
+              </button>
+            )}
 
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-gray-50">
               <div className="space-y-1">

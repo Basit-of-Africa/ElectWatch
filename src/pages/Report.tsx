@@ -13,7 +13,9 @@ import {
   Users, 
   ShieldAlert,
   ClipboardCheck,
-  Loader2
+  Loader2,
+  Navigation,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -23,6 +25,10 @@ const reportSchema = z.object({
   description: z.string().min(10, 'Description must be at least 10 characters'),
   voterCount: z.number().optional(),
   severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  location: z.object({
+    lat: z.number(),
+    lng: z.number()
+  }).optional(),
 });
 
 type ReportForm = z.infer<typeof reportSchema>;
@@ -32,14 +38,33 @@ export default function Report() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-  const { register, handleSubmit, formState: { errors }, watch, reset } = useForm<ReportForm>({
+  const { register, handleSubmit, formState: { errors }, watch, reset, setValue } = useForm<ReportForm>({
     resolver: zodResolver(reportSchema),
     defaultValues: {
       type: 'accreditation',
       pollingUnitId: user?.assignedPollingUnitId || '',
     }
   });
+
+  const handleAcquireLocation = () => {
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocation(coords);
+        setValue('location', coords);
+        setIsGettingLocation(false);
+      },
+      (err) => {
+        console.error(err);
+        setIsGettingLocation(false);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
 
   if (isSupervisor) {
     return (
@@ -62,6 +87,7 @@ export default function Report() {
         observerId: user?.uid,
         timestamp: serverTimestamp(),
         type: data.type,
+        location: data.location || null,
         payload: {
           description: data.description,
           voterCount: data.voterCount,
@@ -149,17 +175,49 @@ export default function Report() {
         )}
 
         {/* Polling Unit Section */}
-        <div className="space-y-4">
-          <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
-            <MapPin className="w-4 h-4" /> Polling Location
-          </label>
-          <div className="relative group">
-            <input
-              {...register('pollingUnitId')}
-              placeholder="e.g. PU-LAG-102"
-              className={`w-full bg-gray-50 border-2 ${errors.pollingUnitId ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-2xl py-4 px-6 text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5`}
-            />
-            {errors.pollingUnitId && <p className="text-red-500 text-xs font-semibold mt-2 ml-4">{errors.pollingUnitId.message}</p>}
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
+              <MapPin className="w-4 h-4" /> Polling Location
+            </label>
+            <div className="relative group">
+              <input
+                {...register('pollingUnitId')}
+                placeholder="e.g. PU-LAG-102"
+                className={`w-full bg-gray-50 border-2 ${errors.pollingUnitId ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-2xl py-4 px-6 text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5`}
+              />
+              {errors.pollingUnitId && <p className="text-red-500 text-xs font-semibold mt-2 ml-4">{errors.pollingUnitId.message}</p>}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
+              <Globe className="w-4 h-4" /> Geolocation
+            </label>
+            <button 
+              type="button"
+              onClick={handleAcquireLocation}
+              disabled={isGettingLocation}
+              className={`w-full h-[64px] rounded-2xl border-2 flex items-center justify-center gap-3 transition-all ${
+                location 
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700' 
+                  : 'border-dashed border-gray-200 bg-gray-50 text-gray-500 hover:border-emerald-300 hover:bg-emerald-50/10'
+              }`}
+            >
+              {isGettingLocation ? (
+                <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              ) : location ? (
+                <>
+                  <Navigation className="w-4 h-4" />
+                  GPS Attached ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})
+                </>
+              ) : (
+                <>
+                  <MapPin className="w-4 h-4" />
+                  Attach Safe Location
+                </>
+              )}
+            </button>
           </div>
         </div>
 

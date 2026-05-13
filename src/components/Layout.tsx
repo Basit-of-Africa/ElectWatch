@@ -11,18 +11,44 @@ import {
   LogOut, 
   Menu, 
   X,
-  Vote
+  Vote,
+  Map as MapIcon,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { onSnapshotsInSync } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export default function Layout() {
   const { user, isAdmin, isSupervisor } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Track Firestore sync status
+    const unsubscribeSync = onSnapshotsInSync(db, () => {
+      setIsSyncing(false);
+    });
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubscribeSync();
+    };
+  }, []);
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Incident Map', href: '/map', icon: MapIcon },
     // Administrators and supervisors can see all reports
     ...(isAdmin || isSupervisor ? [{ name: 'Reports', href: '/reports', icon: FileText }] : []),
     // Only common observers and admins can submit reports in this model
@@ -143,7 +169,35 @@ export default function Layout() {
 
       {/* Main Content Area */}
       <main className="flex-1 min-h-screen">
-        <header className="hidden md:flex justify-end p-6 border-b border-gray-50 bg-white/50 backdrop-blur-sm sticky top-0 z-30">
+        <header className="hidden md:flex justify-between items-center p-6 border-b border-gray-50 bg-white/50 backdrop-blur-sm sticky top-0 z-30">
+          <div className="flex items-center gap-4 px-4">
+             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-100 shadow-sm">
+                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'}`} />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  {isOnline ? (
+                    <>
+                      <Wifi className="w-3 h-3 text-emerald-500" />
+                      Live Connection
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="w-3 h-3 text-red-500" />
+                      Offline Mode
+                    </>
+                  )}
+                </span>
+             </div>
+             {isSyncing && (
+               <motion.span 
+                 initial={{ opacity: 0 }}
+                 animate={{ opacity: 1 }}
+                 className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1"
+               >
+                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                 Syncing
+               </motion.span>
+             )}
+          </div>
           <div className="flex items-center gap-4">
              <div className="h-8 w-px bg-gray-100 mx-2" />
              <NotificationCenter />
