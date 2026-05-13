@@ -33,6 +33,11 @@ export interface Report {
     lat: number;
     lng: number;
   };
+  media?: {
+    url: string;
+    type: string;
+    hash?: string;
+  }[];
 }
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical';

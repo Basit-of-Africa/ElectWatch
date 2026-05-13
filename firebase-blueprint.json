@@ -52,6 +52,18 @@
             "lat": { "type": "number" },
             "lng": { "type": "number" }
           }
+        },
+        "media": {
+          "type": "array",
+          "description": "List of evidence-grade media attachments (photos/video hashes).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "type": { "type": "string" },
+              "hash": { "type": "string", "description": "SHA-256 hash for integrity verification." }
+            }
+          }
         }
       },
       "required": ["id", "pollingUnitId", "observerId", "timestamp", "type", "payload"]

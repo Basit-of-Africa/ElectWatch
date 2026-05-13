@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Edit2,
   Sparkles,
-  Zap
+  Zap,
+  Camera
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -172,6 +173,25 @@ export default function IncidentDetail() {
                 {incident.description}
               </p>
             </div>
+
+            {/* Visual Evidence Section */}
+            {report?.media && report.media.length > 0 && (
+              <div className="pt-8 border-t border-gray-50">
+                <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1 mb-6">
+                  <Camera className="w-4 h-4" /> Visual Evidence
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {report.media.map((item, idx) => (
+                    <div key={idx} className="aspect-square rounded-3xl overflow-hidden border-2 border-gray-50 relative group shadow-sm hover:shadow-xl transition-all">
+                      <img src={item.url} className="w-full h-full object-cover" alt="Evidence" />
+                      <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform">
+                        <p className="text-[7px] text-white/90 font-mono break-all">{item.hash}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <AnimatePresence>
               {aiSummary && (

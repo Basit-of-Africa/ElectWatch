@@ -65,11 +65,16 @@ service cloud.firestore {
 
     function isValidReport(data) {
       return data.keys().hasAll(['pollingUnitId', 'observerId', 'timestamp', 'type', 'payload']) &&
-             data.keys().size() <= 6 && // Allow location if present
+             data.keys().size() <= 10 && // Allow location, media, updatedAt, etc.
              isValidId(data.pollingUnitId) &&
              data.observerId == request.auth.uid &&
              data.type in ['accreditation', 'incident', 'result'] &&
              data.payload is map;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['updatedBy', 'timestamp', 'changes']) &&
+             data.keys().size() <= 6;
     }
 
     function isValidIncident(data) {
@@ -113,6 +118,11 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow create: if isSignedIn() && isValidReport(incoming()) && incoming().timestamp == request.time;
       allow update, delete: if isAdmin();
+
+      match /audit_logs/{logId} {
+        allow read: if isAdmin() || isSupervisor();
+        allow create: if isAdmin() && isValidAuditLog(incoming());
+      }
     }
 
     match /incidents/{incidentId} {

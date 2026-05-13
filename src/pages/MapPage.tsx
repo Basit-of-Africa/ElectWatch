@@ -5,16 +5,24 @@ import { db } from '../lib/firebase';
 import { Report } from '../types';
 import { AlertTriangle, MapPin, Clock, ShieldAlert } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 export default function MapPage() {
+  const { user, isAdmin, isSupervisor } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
   useEffect(() => {
-    // Only fetch reports that have location data
-    const q = query(collection(db, 'reports'));
+    if (!user) return;
+
+    // Observers only see their own markers to comply with security rules
+    const reportsBaseQuery = collection(db, 'reports');
+    const q = (!isAdmin && !isSupervisor)
+      ? query(reportsBaseQuery, where('observerId', '==', user.uid))
+      : query(reportsBaseQuery);
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Report))
