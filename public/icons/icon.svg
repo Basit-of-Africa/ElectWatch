@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">CivicWatch</title>
+  <rect width="512" height="512" rx="96" fill="#059669"/>
+  <path fill="#ffffff" d="M256 72 116 132v104c0 89 59 172 140 204 81-32 140-115 140-204V132L256 72Zm0 58 88 38v68c0 60-35 119-88 148-53-29-88-88-88-148v-68l88-38Z"/>
+  <path fill="#fbbf24" d="M256 184c-31 0-56 25-56 56s25 56 56 56 56-25 56-56-25-56-56-56Zm0 36a20 20 0 1 1 0 40 20 20 0 0 1 0-40Z"/>
+</svg>

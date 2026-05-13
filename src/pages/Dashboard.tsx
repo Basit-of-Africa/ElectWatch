@@ -178,7 +178,7 @@ export default function Dashboard() {
         {/* Quick Actions for Observer */}
         {!isAdmin && !isSupervisor && (
           <Link 
-            to="/report" 
+            to="/app/report" 
             className="flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0"
           >
             <PlusCircle className="w-5 h-5" /> Submit New Report
@@ -419,7 +419,7 @@ export default function Dashboard() {
                       <h3 className="text-3xl font-bold font-serif italic">Regional Intel Hub</h3>
                       <p className="text-emerald-200 mt-2 font-medium">Monitoring local field dynamics and escalating issues.</p>
                     </div>
-                    <Link to="/reports" className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
+                    <Link to="/app/reports" className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
                       Audit Region
                     </Link>
                   </div>
@@ -610,7 +610,7 @@ export default function Dashboard() {
               <Clock className="text-emerald-600 w-6 h-6" />
               {isAdmin || isSupervisor ? 'Global Transmission Feed' : 'My Recent Transmission Log'}
             </h3>
-            <Link to="/reports" className="text-emerald-600 font-bold text-sm hover:underline flex items-center gap-1 group">
+            <Link to="/app/reports" className="text-emerald-600 font-bold text-sm hover:underline flex items-center gap-1 group">
               Audit Full Stream <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </Link>
           </div>

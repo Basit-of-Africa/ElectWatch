@@ -1,0 +1,47 @@
+{
+  "name": "CivicWatch Election Monitor",
+  "short_name": "CivicWatch",
+  "description": "Offline-first field reporting and election monitoring for CivicWatch observers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f9fafb",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Submit report",
+      "short_name": "Report",
+      "description": "Open the field report form.",
+      "url": "/app/report",
+      "icons": [
+        {
+          "src": "/icons/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Incident map",
+      "short_name": "Map",
+      "description": "Open the incident map.",
+      "url": "/app/map",
+      "icons": [
+        {
+          "src": "/icons/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}

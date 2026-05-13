@@ -242,7 +242,7 @@ export default function Reports() {
                       <div className="flex items-center justify-end gap-2">
                         {isAdmin && (
                           <Link 
-                            to={`/reports/${report.id}/edit`}
+                            to={`/app/reports/${report.id}/edit`}
                             className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
                             title="Edit Report"
                           >
@@ -250,7 +250,7 @@ export default function Reports() {
                           </Link>
                         )}
                         <Link 
-                          to={`/incidents`} // Ideally would link to PU detail or similar if report has no detail page
+                          to={`/app/incidents`} // Ideally would link to PU detail or similar if report has no detail page
                           className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-900 hover:text-white transition-all shadow-sm"
                         >
                           <ChevronRight className="w-4 h-4" />

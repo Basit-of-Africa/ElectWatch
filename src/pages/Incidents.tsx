@@ -325,7 +325,7 @@ export default function Incidents() {
                         </button>
                         
                         <Link 
-                          to={`/incidents/${incident.id}`}
+                          to={`/app/incidents/${incident.id}`}
                           className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gray-50 text-emerald-700 hover:bg-emerald-50 mt-2 transition-all border border-gray-100"
                         >
                           View Full Details <ChevronRight className="w-3 h-3" />

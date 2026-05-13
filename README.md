@@ -18,3 +18,9 @@ View your app in AI Studio: https://ai.studio/apps/b9fff94a-1adc-45fd-9658-d8af8
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Local access
+
+- Public dashboard: `http://127.0.0.1:3000/`
+- Staff login: `http://127.0.0.1:3000/login`
+- Demo special IDs: `CW-ADMIN`, `CW-SUP`, `CW-OBS`

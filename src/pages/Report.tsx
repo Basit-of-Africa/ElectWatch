@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '../context/AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { 
   Send, 
   AlertCircle, 
@@ -34,11 +34,14 @@ const reportSchema = z.object({
 });
 
 type ReportForm = z.infer<typeof reportSchema>;
+type SubmitState = 'synced' | 'queued';
+
+const SYNC_ACK_TIMEOUT_MS = 4000;
 
 export default function Report() {
   const { user, isSupervisor } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<SubmitState | false>(false);
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
@@ -115,12 +118,17 @@ export default function Report() {
         },
       };
 
-      const docRef = await addDoc(collection(db, 'reports'), reportData);
+      const batch = writeBatch(db);
+      const reportRef = doc(collection(db, 'reports'));
+
+      batch.set(reportRef, reportData);
 
       // If it's an incident, also create a record in incidents collection
       if (data.type === 'incident') {
-        const incidentRef = await addDoc(collection(db, 'incidents'), {
-          reportId: docRef.id,
+        const incidentRef = doc(collection(db, 'incidents'));
+
+        batch.set(incidentRef, {
+          reportId: reportRef.id,
           pollingUnitId: data.pollingUnitId,
           severity: data.severity || 'medium',
           status: 'pending',
@@ -131,29 +139,51 @@ export default function Report() {
         // Trigger notification for critical/high incidents
         if (data.severity === 'critical' || data.severity === 'high') {
           // Notify admins
-          await addDoc(collection(db, 'notifications'), {
+          batch.set(doc(collection(db, 'notifications')), {
             userId: 'admin',
             title: `CRITICAL INCIDENT: ${data.pollingUnitId}`,
             message: data.description,
             type: data.severity === 'critical' ? 'error' : 'warning',
             read: false,
-            link: `/incidents/${incidentRef.id}`,
+            link: `/app/incidents/${incidentRef.id}`,
             timestamp: serverTimestamp(),
           });
           // Notify supervisors
-          await addDoc(collection(db, 'notifications'), {
+          batch.set(doc(collection(db, 'notifications')), {
             userId: 'supervisor',
             title: `CRITICAL INCIDENT: ${data.pollingUnitId}`,
             message: data.description,
             type: data.severity === 'critical' ? 'error' : 'warning',
             read: false,
-            link: `/incidents/${incidentRef.id}`,
+            link: `/app/incidents/${incidentRef.id}`,
             timestamp: serverTimestamp(),
           });
         }
       }
 
-      setSuccess(true);
+      const commit = batch.commit();
+      let submitState: SubmitState = navigator.onLine ? 'synced' : 'queued';
+
+      if (!navigator.onLine) {
+        commit.catch((syncError) => {
+          console.error('Queued report failed to sync:', syncError);
+        });
+      } else {
+        submitState = await Promise.race<SubmitState>([
+          commit.then(() => 'synced'),
+          new Promise((resolve) => {
+            window.setTimeout(() => resolve('queued'), SYNC_ACK_TIMEOUT_MS);
+          }),
+        ]);
+
+        if (submitState === 'queued') {
+          commit.catch((syncError) => {
+            console.error('Queued report failed to sync:', syncError);
+          });
+        }
+      }
+
+      setSuccess(submitState);
       reset();
       setMediaFiles([]);
       setTimeout(() => setSuccess(false), 5000);
@@ -182,7 +212,11 @@ export default function Report() {
             <CheckCircle2 className="w-8 h-8 text-emerald-600" />
             <div>
               <p className="font-bold text-lg leading-tight">Report Received</p>
-              <p className="text-sm opacity-80 mt-1">Your data has been successfully transmitted to the operations center.</p>
+              <p className="text-sm opacity-80 mt-1">
+                {success === 'queued'
+                  ? 'No connection detected. The report is stashed on this device and will sync automatically.'
+                  : 'Your data has been successfully transmitted to the operations center.'}
+              </p>
             </div>
           </motion.div>
         )}

@@ -129,7 +129,7 @@ export default function IncidentDetail() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-10 pb-20">
-      <Link to="/incidents" className="inline-flex items-center gap-2 text-gray-500 hover:text-emerald-700 transition-colors font-bold group">
+      <Link to="/app/incidents" className="inline-flex items-center gap-2 text-gray-500 hover:text-emerald-700 transition-colors font-bold group">
         <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
         Back to Incidents
       </Link>
@@ -155,7 +155,7 @@ export default function IncidentDetail() {
               <div className="flex items-center gap-3">
                 {isAdmin && report && (
                   <Link 
-                    to={`/reports/${report.id}/edit`}
+                    to={`/app/reports/${report.id}/edit`}
                     className="px-4 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-emerald-600 transition-all flex items-center gap-2"
                   >
                     <Edit2 className="w-3.5 h-3.5" /> Edit Original Report

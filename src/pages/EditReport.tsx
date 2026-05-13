@@ -135,7 +135,7 @@ export default function EditReport() {
           message: `Admin ${auth.currentUser?.displayName} has reclassified a report as an incident.`,
           type: 'warning',
           read: false,
-          link: `/reports`, 
+          link: `/app/reports`, 
           timestamp: serverTimestamp(),
         });
       }
@@ -156,7 +156,7 @@ export default function EditReport() {
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-20">
       <div className="flex items-center justify-between">
-        <Link to="/reports" className="inline-flex items-center gap-2 text-gray-500 hover:text-emerald-700 transition-colors font-bold group">
+        <Link to="/app/reports" className="inline-flex items-center gap-2 text-gray-500 hover:text-emerald-700 transition-colors font-bold group">
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
           Back to Reports
         </Link>

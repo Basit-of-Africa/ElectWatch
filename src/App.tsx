@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
 import Login from './pages/Login';
+import PublicDashboard from './pages/PublicDashboard';
 import Dashboard from './pages/Dashboard';
 import Report from './pages/Report';
 import Reports from './pages/Reports';
@@ -17,7 +18,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (adminOnly && !isAdmin) return <Navigate to="/" />;
+  if (adminOnly && !isAdmin) return <Navigate to="/app" />;
 
   return <>{children}</>;
 }
@@ -25,9 +26,10 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<PublicDashboard />} />
       <Route path="/login" element={<Login />} />
       <Route
-        path="/"
+        path="/app"
         element={
           <ProtectedRoute>
             <Layout />
@@ -42,6 +44,7 @@ function AppRoutes() {
         <Route path="incidents" element={<Incidents />} />
         <Route path="incidents/:id" element={<IncidentDetail />} />
       </Route>
+      <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
 }
