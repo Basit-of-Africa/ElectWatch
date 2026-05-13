@@ -12,10 +12,15 @@ import {
   Filter,
   MoreVertical,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  Download,
+  FileText,
+  Table as TableIcon
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function Incidents() {
   const { isAdmin } = useAuth();
@@ -24,6 +29,59 @@ export default function Incidents() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const exportToCSV = () => {
+    const headers = ['ID', 'Polling Unit', 'Severity', 'Status', 'Description', 'Timestamp'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredIncidents.map(i => [
+        i.id,
+        i.pollingUnitId,
+        i.severity,
+        i.status,
+        `"${i.description.replace(/"/g, '""')}"`,
+        i.timestamp instanceof Object ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `incidents_export_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setShowExportMenu(false);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.text('Election Incident Report', 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, 22);
+    
+    const tableData = filteredIncidents.map(i => [
+      i.pollingUnitId,
+      i.severity.toUpperCase(),
+      i.status.toUpperCase(),
+      i.description,
+      i.timestamp instanceof Object ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+    ]);
+
+    autoTable(doc, {
+      head: [['PU', 'Severity', 'Status', 'Description', 'Timestamp']],
+      body: tableData,
+      startY: 30,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [4, 120, 87] }
+    });
+
+    doc.save(`incidents_export_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+    setShowExportMenu(false);
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'incidents'), orderBy('timestamp', 'desc'));
@@ -106,6 +164,43 @@ export default function Incidents() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
+          {/* Export Button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              Export
+            </button>
+            
+            <AnimatePresence>
+              {showExportMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+                >
+                  <button
+                    onClick={exportToCSV}
+                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+                  >
+                    <TableIcon className="w-4 h-4 text-emerald-600" />
+                    Export to CSV
+                  </button>
+                  <button
+                    onClick={exportToPDF}
+                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    Export to PDF
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {/* Status Filter */}
           <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
             {['all', 'pending', 'investigating', 'resolved'].map((f) => (

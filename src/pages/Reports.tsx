@@ -11,11 +11,15 @@ import {
   Filter,
   ChevronRight,
   Edit2,
-  ExternalLink
+  ExternalLink,
+  Download,
+  Table as TableIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function Reports() {
   const { isAdmin, isSupervisor } = useAuth();
@@ -23,6 +27,56 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const exportToCSV = () => {
+    const headers = ['ID', 'Type', 'Polling Unit', 'Timestamp'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredReports.map(r => [
+        r.id,
+        r.type,
+        r.pollingUnitId,
+        r.timestamp instanceof Object ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `reports_export_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setShowExportMenu(false);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.text('Election Field Reports', 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, 22);
+    
+    const tableData = filteredReports.map(r => [
+      r.id.substring(0, 8),
+      r.type.toUpperCase(),
+      r.pollingUnitId,
+      r.timestamp instanceof Object ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+    ]);
+
+    autoTable(doc, {
+      head: [['Report ID', 'Type', 'Polling Unit', 'Timestamp']],
+      body: tableData,
+      startY: 30,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [4, 120, 87] }
+    });
+
+    doc.save(`reports_export_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+    setShowExportMenu(false);
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'reports'), orderBy('timestamp', 'desc'));
@@ -78,6 +132,43 @@ export default function Reports() {
             <option value="incident">Incidents</option>
             <option value="result">Results</option>
           </select>
+
+          {/* Export Button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2 px-6 py-3.5 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              Export
+            </button>
+            
+            <AnimatePresence>
+              {showExportMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+                >
+                  <button
+                    onClick={exportToCSV}
+                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+                  >
+                    <TableIcon className="w-4 h-4 text-emerald-600" />
+                    Export to CSV
+                  </button>
+                  <button
+                    onClick={exportToPDF}
+                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    Export to PDF
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
