@@ -118,7 +118,7 @@ export default function Dashboard() {
     const date = subDays(new Date(), 6 - i);
     const dayIncidents = incidents.filter(inc => {
       if (!inc.timestamp) return false;
-      const incDate = inc.timestamp instanceof Object ? (inc.timestamp as any).toDate() : new Date(inc.timestamp);
+      const incDate = (inc.timestamp as any)?.toDate ? (inc.timestamp as any).toDate() : new Date(inc.timestamp);
       return isSameDay(incDate, date);
     });
 
@@ -328,7 +328,7 @@ export default function Dashboard() {
                    >
                       <div className="flex justify-between items-start mb-1">
                         <p className="text-[10px] font-bold text-red-700 uppercase tracking-widest">{incident.severity} PRIORITY</p>
-                        <p className="text-[9px] font-mono text-gray-400">{incident.timestamp instanceof Object ? formatDistanceToNow((incident.timestamp as any).toDate(), { addSuffix: true }) : 'Now'}</p>
+                        <p className="text-[9px] font-mono text-gray-400">{(incident.timestamp as any)?.toDate ? formatDistanceToNow((incident.timestamp as any).toDate(), { addSuffix: true }) : 'Now'}</p>
                       </div>
                       <p className="text-xs font-bold text-red-950 line-clamp-2">{incident.description}</p>
                       <div className="mt-2 flex items-center gap-2">
@@ -492,7 +492,7 @@ export default function Dashboard() {
                                incident.severity === 'critical' ? 'bg-red-100 text-red-700' :
                                incident.severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700'
                              }`}>{incident.severity}</span>
-                             <p className="text-[9px] text-gray-400 font-mono italic">{incident.timestamp instanceof Object ? formatDistanceToNow((incident.timestamp as any).toDate(), { addSuffix: true }) : 'Now'}</p>
+                             <p className="text-[9px] text-gray-400 font-mono italic">{(incident.timestamp as any)?.toDate ? formatDistanceToNow((incident.timestamp as any).toDate(), { addSuffix: true }) : 'Now'}</p>
                            </div>
                            <p className="text-xs font-bold text-gray-900 line-clamp-1 group-hover:text-emerald-700 transition-colors">{incident.description}</p>
                            <p className="text-[10px] text-gray-400 font-mono mt-1 uppercase tracking-widest">{incident.pollingUnitId}</p>
@@ -666,7 +666,7 @@ export default function Dashboard() {
                         POLLING UNIT #{report.pollingUnitId}
                       </h4>
                       <span className="text-[10px] bg-white border border-gray-100 shadow-sm text-gray-500 px-3 py-1.5 rounded-full font-bold uppercase tracking-widest whitespace-nowrap">
-                         {report.timestamp instanceof Object ? formatDistanceToNow((report.timestamp as any).toDate(), { addSuffix: true }) : 'Now'}
+                         {(report.timestamp as any)?.toDate ? formatDistanceToNow((report.timestamp as any).toDate(), { addSuffix: true }) : 'Now'}
                       </span>
                     </div>
                     <p className="text-gray-500 mt-2 line-clamp-2 leading-relaxed font-medium">

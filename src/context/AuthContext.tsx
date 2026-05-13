@@ -24,18 +24,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setFirebaseUser(fUser);
       if (fUser) {
         // Fetch custom user data from Firestore for roles
-        const userDoc = await getDoc(doc(db, 'users', fUser.uid));
+        const userRef = doc(db, 'users', fUser.uid);
+        const userDoc = await getDoc(userRef);
         if (userDoc.exists()) {
           setUser(userDoc.data() as User);
         } else {
-          // Fallback if user document doesn't exist yet (e.g., first login)
-          setUser({
+          // Create user document if it doesn't exist yet (first login)
+          const newUser: User = {
             uid: fUser.uid,
             displayName: fUser.displayName || 'Unknown',
             email: fUser.email || '',
             role: 'observer', // Default role
             createdAt: new Date().toISOString(),
-          });
+          };
+          try {
+            const { setDoc } = await import('firebase/firestore');
+            await setDoc(userRef, newUser);
+            setUser(newUser);
+          } catch (error) {
+            console.error("Error creating user profile:", error);
+            setUser(newUser);
+          }
         }
       } else {
         setUser(null);

@@ -41,7 +41,7 @@ export default function Incidents() {
         i.severity,
         i.status,
         `"${i.description.replace(/"/g, '""')}"`,
-        i.timestamp instanceof Object ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+        (i.timestamp as any)?.toDate ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
       ].join(','))
     ].join('\n');
 
@@ -68,7 +68,7 @@ export default function Incidents() {
       i.severity.toUpperCase(),
       i.status.toUpperCase(),
       i.description,
-      i.timestamp instanceof Object ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+      (i.timestamp as any)?.toDate ? format((i.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
     ]);
 
     autoTable(doc, {
@@ -278,7 +278,7 @@ export default function Incidents() {
                       <div className="flex items-center gap-6 text-sm text-gray-400 font-medium">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-4 h-4" /> 
-                          {incident.timestamp instanceof Object ? formatDistanceToNow((incident.timestamp as any).toDate(), { addSuffix: true }) : 'N/A'}
+                          {(incident.timestamp as any)?.toDate ? formatDistanceToNow((incident.timestamp as any).toDate(), { addSuffix: true }) : 'N/A'}
                         </span>
                         <span className="h-1 w-1 rounded-full bg-gray-300" />
                         <span className="flex items-center gap-1.5">

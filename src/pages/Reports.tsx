@@ -37,7 +37,7 @@ export default function Reports() {
         r.id,
         r.type,
         r.pollingUnitId,
-        r.timestamp instanceof Object ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+        (r.timestamp as any)?.toDate ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
       ].join(','))
     ].join('\n');
 
@@ -63,7 +63,7 @@ export default function Reports() {
       r.id.substring(0, 8),
       r.type.toUpperCase(),
       r.pollingUnitId,
-      r.timestamp instanceof Object ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+      (r.timestamp as any)?.toDate ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
     ]);
 
     autoTable(doc, {
@@ -226,7 +226,7 @@ export default function Reports() {
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         <Calendar className="w-4 h-4 text-gray-300" />
-                        {report.timestamp instanceof Object ? format((report.timestamp as any).toDate(), 'MMM d, HH:mm') : 'N/A'}
+                        {(report.timestamp as any)?.toDate ? format((report.timestamp as any).toDate(), 'MMM d, HH:mm') : 'N/A'}
                       </div>
                     </td>
                     <td className="px-8 py-6">
