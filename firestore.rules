@@ -101,7 +101,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin(); // Switched to isAdmin() which uses get() because list is only /users/
-      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow create: if isAdmin() || (isOwner(userId) && isValidUser(incoming()));
       allow update: if (isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'assignedPollingUnitId']))) && 
                     isValidUser(incoming());
       allow update: if isAdmin(); // Admin can change everything

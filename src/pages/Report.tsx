@@ -1,45 +1,108 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import React, { useEffect, useMemo, useState } from 'react';
+import { collection, doc, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
+import {
+  AlertCircle,
+  Camera,
+  CheckCircle2,
+  ClipboardCheck,
+  ClipboardList,
+  Globe,
+  Loader2,
+  MapPin,
+  Navigation,
+  Send,
+  ShieldAlert,
+  Users,
+  X,
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import FormTemplateRenderer from '../components/FormTemplateRenderer';
 import { useAuth } from '../context/AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { 
-  Send, 
-  AlertCircle, 
-  CheckCircle2, 
-  MapPin, 
-  Users, 
-  ShieldAlert,
-  ClipboardCheck,
-  Loader2,
-  Navigation,
-  Globe,
-  Camera,
-  X
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import {
+  DEFAULT_LANGUAGE,
+  FORM_TEMPLATE_COLLECTION,
+  FormAnswers,
+  defaultFormTemplates,
+  getDescriptionFromAnswers,
+  getSeverityFromAnswers,
+  localized,
+  reportTypeLabels,
+  shouldShowQuestion,
+} from '../lib/formTemplates';
+import { FormTemplate, ReportType } from '../types';
 
-const reportSchema = z.object({
-  pollingUnitId: z.string().min(1, 'Polling Unit ID is required'),
-  type: z.enum(['accreditation', 'incident', 'result']),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  voterCount: z.number().optional(),
-  severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-  location: z.object({
-    lat: z.number(),
-    lng: z.number()
-  }).optional(),
-});
-
-type ReportForm = z.infer<typeof reportSchema>;
 type SubmitState = 'synced' | 'queued';
 
 const SYNC_ACK_TIMEOUT_MS = 4000;
 
+const reportTypeIcons: Record<ReportType, typeof Users> = {
+  accreditation: Users,
+  incident: ShieldAlert,
+  result: ClipboardCheck,
+  checklist: ClipboardList,
+};
+
+const reportTypeStyles: Record<ReportType, { selected: string; icon: string }> = {
+  accreditation: {
+    selected: 'border-emerald-500 bg-emerald-50/30 shadow-emerald-500/10',
+    icon: 'bg-emerald-500 text-white',
+  },
+  incident: {
+    selected: 'border-red-500 bg-red-50/30 shadow-red-500/10',
+    icon: 'bg-red-500 text-white',
+  },
+  result: {
+    selected: 'border-blue-500 bg-blue-50/30 shadow-blue-500/10',
+    icon: 'bg-blue-500 text-white',
+  },
+  checklist: {
+    selected: 'border-indigo-500 bg-indigo-50/30 shadow-indigo-500/10',
+    icon: 'bg-indigo-500 text-white',
+  },
+};
+
+function getInitialAnswers(template: FormTemplate | undefined) {
+  if (!template) return {};
+
+  return template.sections.reduce((sectionAcc, section) => {
+    section.questions.forEach(question => {
+      if (question.type === 'multiSelect') sectionAcc[question.id] = [];
+      else if (question.type === 'rating') sectionAcc[question.id] = question.ratingScale ? Math.ceil(question.ratingScale / 2) : 3;
+      else sectionAcc[question.id] = '';
+    });
+    return sectionAcc;
+  }, {} as FormAnswers);
+}
+
+function getPublishedTemplates(templates: FormTemplate[]) {
+  const published = templates.filter(template => template.status === 'published');
+  return published.length > 0 ? published : defaultFormTemplates;
+}
+
+function getRequiredValidationError(template: FormTemplate | undefined, answers: FormAnswers) {
+  if (!template) return 'No published form template is available for this report type.';
+
+  for (const section of template.sections) {
+    for (const question of section.questions) {
+      if (!question.required || !shouldShowQuestion(question, answers)) continue;
+      const answer = answers[question.id];
+      const isEmptyArray = Array.isArray(answer) && answer.length === 0;
+      const isEmptyValue = answer === undefined || answer === null || answer === '';
+      if (isEmptyArray || isEmptyValue) return `${localized(question.label)} is required.`;
+    }
+  }
+
+  return null;
+}
+
 export default function Report() {
   const { user, isSupervisor } = useAuth();
+  const [templates, setTemplates] = useState<FormTemplate[]>(defaultFormTemplates);
+  const [reportType, setReportType] = useState<ReportType>('accreditation');
+  const [templateId, setTemplateId] = useState('');
+  const [answers, setAnswers] = useState<FormAnswers>({});
+  const [pollingUnitId, setPollingUnitId] = useState(user?.assignedPollingUnitId || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState<SubmitState | false>(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,23 +110,41 @@ export default function Report() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<{ url: string, name: string, type: string, hash?: string }[]>([]);
 
-  const { register, handleSubmit, formState: { errors }, watch, reset, setValue } = useForm<ReportForm>({
-    resolver: zodResolver(reportSchema),
-    defaultValues: {
-      type: 'accreditation',
-      pollingUnitId: user?.assignedPollingUnitId || '',
-    }
-  });
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, FORM_TEMPLATE_COLLECTION), (snapshot) => {
+      const docs = snapshot.docs.map(templateDoc => ({ id: templateDoc.id, ...templateDoc.data() } as FormTemplate));
+      setTemplates(getPublishedTemplates(docs));
+    }, (snapshotError) => {
+      console.warn('Falling back to bundled form templates.', snapshotError);
+      setTemplates(defaultFormTemplates);
+    });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    return () => unsubscribe();
+  }, []);
+
+  const templatesForType = useMemo(
+    () => templates.filter(template => template.reportType === reportType && template.status === 'published'),
+    [reportType, templates]
+  );
+
+  const selectedTemplate = useMemo(() => {
+    return templatesForType.find(template => template.id === templateId) || templatesForType[0];
+  }, [templateId, templatesForType]);
+
+  useEffect(() => {
+    if (!selectedTemplate) return;
+    setTemplateId(selectedTemplate.id);
+    setAnswers(getInitialAnswers(selectedTemplate));
+  }, [selectedTemplate?.id]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
     if (!files) return;
 
-    Array.from(files).forEach(file => {
-      const url = URL.createObjectURL(file as File);
-      // Simulate cryptographic hash generation for evidence integrity
-      const mockHash = 'sha256-' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      setMediaFiles(prev => [...prev, { url, name: (file as File).name, type: (file as File).type, hash: mockHash }]);
+    Array.from(files as FileList).forEach((file: File) => {
+      const url = URL.createObjectURL(file);
+      const mockHash = 'sha256-' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      setMediaFiles(prev => [...prev, { url, name: file.name, type: file.type, hash: mockHash }]);
     });
   };
 
@@ -71,15 +152,11 @@ export default function Report() {
     setMediaFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const reportType = watch('type');
-
   const handleAcquireLocation = () => {
     setIsGettingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocation(coords);
-        setValue('location', coords);
+        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setIsGettingLocation(false);
       },
       (err) => {
@@ -100,21 +177,34 @@ export default function Report() {
     );
   }
 
-  const onSubmit = async (data: ReportForm) => {
+  const onSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setIsSubmitting(true);
     setError(null);
+
     try {
+      if (!pollingUnitId.trim()) throw new Error('Polling Unit ID is required.');
+
+      const validationError = getRequiredValidationError(selectedTemplate, answers);
+      if (validationError) throw new Error(validationError);
+
+      const description = getDescriptionFromAnswers(selectedTemplate, answers);
+      const severity = getSeverityFromAnswers(answers);
       const reportData = {
-        pollingUnitId: data.pollingUnitId,
+        pollingUnitId: pollingUnitId.trim(),
         observerId: user?.uid,
         timestamp: serverTimestamp(),
-        type: data.type,
-        location: data.location || null,
-        media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash })),
+        type: reportType,
+        formTemplateId: selectedTemplate?.id,
+        formTemplateCode: selectedTemplate?.code,
+        location,
+        media: mediaFiles.map(media => ({ url: media.url, type: media.type, hash: media.hash })),
         payload: {
-          description: data.description,
-          voterCount: data.voterCount,
-          severity: data.severity,
+          description,
+          severity: reportType === 'incident' ? severity : answers.severity,
+          voterCount: answers.voterCount,
+          formName: selectedTemplate ? localized(selectedTemplate.name) : '',
+          answers,
         },
       };
 
@@ -123,41 +213,30 @@ export default function Report() {
 
       batch.set(reportRef, reportData);
 
-      // If it's an incident, also create a record in incidents collection
-      if (data.type === 'incident') {
+      if (reportType === 'incident') {
         const incidentRef = doc(collection(db, 'incidents'));
 
         batch.set(incidentRef, {
           reportId: reportRef.id,
-          pollingUnitId: data.pollingUnitId,
-          severity: data.severity || 'medium',
+          pollingUnitId: pollingUnitId.trim(),
+          severity,
           status: 'pending',
-          description: data.description,
+          description,
           timestamp: serverTimestamp(),
         });
 
-        // Trigger notification for critical/high incidents
-        if (data.severity === 'critical' || data.severity === 'high') {
-          // Notify admins
-          batch.set(doc(collection(db, 'notifications')), {
-            userId: 'admin',
-            title: `CRITICAL INCIDENT: ${data.pollingUnitId}`,
-            message: data.description,
-            type: data.severity === 'critical' ? 'error' : 'warning',
+        if (severity === 'critical' || severity === 'high') {
+          const notificationPayload = {
+            title: `CRITICAL INCIDENT: ${pollingUnitId.trim()}`,
+            message: description,
+            type: severity === 'critical' ? 'error' : 'warning',
             read: false,
             link: `/app/incidents/${incidentRef.id}`,
             timestamp: serverTimestamp(),
-          });
-          // Notify supervisors
-          batch.set(doc(collection(db, 'notifications')), {
-            userId: 'supervisor',
-            title: `CRITICAL INCIDENT: ${data.pollingUnitId}`,
-            message: data.description,
-            type: data.severity === 'critical' ? 'error' : 'warning',
-            read: false,
-            link: `/app/incidents/${incidentRef.id}`,
-            timestamp: serverTimestamp(),
-          });
+          };
+
+          batch.set(doc(collection(db, 'notifications')), { ...notificationPayload, userId: 'admin' });
+          batch.set(doc(collection(db, 'notifications')), { ...notificationPayload, userId: 'supervisor' });
         }
       }
 
@@ -184,11 +263,11 @@ export default function Report() {
       }
 
       setSuccess(submitState);
-      reset();
+      setAnswers(getInitialAnswers(selectedTemplate));
       setMediaFiles([]);
       setTimeout(() => setSuccess(false), 5000);
-    } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, 'reports');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to submit this report.');
     } finally {
       setIsSubmitting(false);
     }
@@ -198,12 +277,12 @@ export default function Report() {
     <div className="max-w-3xl mx-auto space-y-10">
       <div className="text-center md:text-left">
         <h1 className="text-4xl font-bold text-gray-900 tracking-tight font-serif">Submit Field Report</h1>
-        <p className="text-gray-500 mt-2 text-lg">Use this form to document accreditation, incidents, or final results.</p>
+        <p className="text-gray-500 mt-2 text-lg">Use admin-configured templates for accreditation, incidents, results, or observer checklists.</p>
       </div>
 
       <AnimatePresence>
         {success && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -222,40 +301,37 @@ export default function Report() {
         )}
       </AnimatePresence>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-8 md:p-12 space-y-8">
+      <form onSubmit={onSubmit} className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-8 md:p-12 space-y-8">
         {error && (
           <div className="p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" /> {error}
           </div>
         )}
 
-        {/* Polling Unit Section */}
         <div className="grid md:grid-cols-2 gap-8">
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
               <MapPin className="w-4 h-4" /> Polling Location
             </label>
-            <div className="relative group">
-              <input
-                {...register('pollingUnitId')}
-                placeholder="e.g. PU-LAG-102"
-                className={`w-full bg-gray-50 border-2 ${errors.pollingUnitId ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-2xl py-4 px-6 text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5`}
-              />
-              {errors.pollingUnitId && <p className="text-red-500 text-xs font-semibold mt-2 ml-4">{errors.pollingUnitId.message}</p>}
-            </div>
+            <input
+              value={pollingUnitId}
+              onChange={(event) => setPollingUnitId(event.target.value)}
+              placeholder="e.g. PU-LAG-102"
+              className="w-full bg-gray-50 border-2 border-gray-50 focus:border-emerald-500 rounded-2xl py-4 px-6 text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5"
+            />
           </div>
 
           <div className="space-y-4">
             <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
               <Globe className="w-4 h-4" /> Geolocation
             </label>
-            <button 
+            <button
               type="button"
               onClick={handleAcquireLocation}
               disabled={isGettingLocation}
               className={`w-full h-[64px] rounded-2xl border-2 flex items-center justify-center gap-3 transition-all ${
-                location 
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700' 
+                location
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                   : 'border-dashed border-gray-200 bg-gray-50 text-gray-500 hover:border-emerald-300 hover:bg-emerald-50/10'
               }`}
             >
@@ -276,7 +352,6 @@ export default function Report() {
           </div>
         </div>
 
-        {/* Evidence Vault Section */}
         <div className="space-y-6">
           <div className="flex justify-between items-center px-1">
             <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest">
@@ -290,8 +365,8 @@ export default function Report() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <AnimatePresence>
               {mediaFiles.map((file, idx) => (
-                <motion.div 
-                  key={idx}
+                <motion.div
+                  key={`${file.name}-${idx}`}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
@@ -300,7 +375,7 @@ export default function Report() {
                   <img src={file.url} className="w-full h-full object-cover" alt="Evidence" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 text-center">
                     <p className="text-[8px] text-white/80 font-mono break-all mb-4">{file.hash}</p>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => removeMedia(idx)}
                       className="bg-white/20 backdrop-blur-md rounded-full p-2 hover:bg-white/40 transition-colors"
@@ -311,13 +386,13 @@ export default function Report() {
                 </motion.div>
               ))}
             </AnimatePresence>
-            
+
             <label className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-emerald-300 hover:bg-emerald-50/10 transition-all group">
-              <input 
-                type="file" 
-                multiple 
-                accept="image/*" 
-                className="hidden" 
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
                 onChange={handleFileChange}
               />
               <div className="w-10 h-10 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -328,104 +403,77 @@ export default function Report() {
           </div>
         </div>
 
-        {/* Report Type Section */}
-        <div className="grid md:grid-cols-3 gap-4">
-          {(['accreditation', 'incident', 'result'] as const).map((type) => {
+        <div className="grid md:grid-cols-4 gap-4">
+          {(['accreditation', 'incident', 'result', 'checklist'] as const).map((type) => {
             const isSelected = reportType === type;
-            const Icon = type === 'accreditation' ? Users : type === 'incident' ? ShieldAlert : ClipboardCheck;
-            const color = type === 'accreditation' ? 'emerald' : type === 'incident' ? 'red' : 'blue';
-            
+            const Icon = reportTypeIcons[type];
+
             return (
-              <label 
+              <button
                 key={type}
-                className={`relative cursor-pointer transition-all duration-300 ${isSelected ? 'translate-y-[-4px]' : ''}`}
+                type="button"
+                onClick={() => {
+                  setReportType(type);
+                  setTemplateId('');
+                }}
+                className={`relative text-left transition-all duration-300 ${isSelected ? 'translate-y-[-4px]' : ''}`}
               >
-                <input
-                  type="radio"
-                  value={type}
-                  className="sr-only"
-                  {...register('type')}
-                />
-                <div className={`h-full p-6 rounded-3xl border-2 transition-all duration-300 ${
-                  isSelected 
-                    ? `border-${color}-500 bg-${color}-50/30 shadow-lg shadow-${color}-500/10` 
+                <div className={`h-full p-5 rounded-3xl border-2 transition-all duration-300 ${
+                  isSelected
+                    ? `${reportTypeStyles[type].selected} shadow-lg`
                     : 'border-gray-100 bg-white hover:border-gray-200'
                 }`}>
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
-                    isSelected ? `bg-${color}-500 text-white` : 'bg-gray-100 text-gray-500'
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
+                    isSelected ? reportTypeStyles[type].icon : 'bg-gray-100 text-gray-500'
                   }`}>
-                    <Icon className="w-6 h-6" />
+                    <Icon className="w-5 h-5" />
                   </div>
-                  <p className={`font-bold capitalize ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>
-                    {type}
+                  <p className={`font-bold ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>
+                    {reportTypeLabels[type]}
                   </p>
                 </div>
-              </label>
+              </button>
             );
           })}
         </div>
 
-        {/* Dynamic Fields Section */}
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
-              Observation Details
-            </label>
-            <textarea
-              {...register('description')}
-              rows={4}
-              placeholder="Describe what you see on the ground..."
-              className={`w-full bg-gray-50 border-2 ${errors.description ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-3xl py-4 px-6 text-lg outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5 resize-none`}
-            />
-            {errors.description && <p className="text-red-500 text-xs font-semibold mt-1 ml-4">{errors.description.message}</p>}
+        {templatesForType.length > 1 && (
+          <label className="block space-y-2">
+            <span className="text-xs font-black uppercase tracking-widest text-gray-400">Template Variant</span>
+            <select
+              value={selectedTemplate?.id || ''}
+              onChange={(event) => setTemplateId(event.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-5 outline-none focus:border-emerald-500 font-bold text-gray-700"
+            >
+              {templatesForType.map(template => (
+                <option key={template.id} value={template.id}>
+                  {localized(template.name)} ({template.code})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {selectedTemplate ? (
+          <FormTemplateRenderer
+            template={selectedTemplate}
+            answers={answers}
+            language={DEFAULT_LANGUAGE}
+            onChange={(questionId, value) => {
+              setAnswers(prev => ({ ...prev, [questionId]: value }));
+            }}
+          />
+        ) : (
+          <div className="rounded-3xl bg-amber-50 border border-amber-100 text-amber-800 p-6 font-bold">
+            No published template found for {reportTypeLabels[reportType]}. Ask an administrator to publish one in Form Builder.
           </div>
-
-          <AnimatePresence mode="wait">
-            {reportType === 'accreditation' && (
-              <motion.div 
-                key="accreditation-fields"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-gray-50 rounded-3xl border border-gray-100"
-              >
-                <label className="text-sm font-bold text-gray-600 block">Number of voters accredited so far</label>
-                <input
-                  type="number"
-                  {...register('voterCount', { valueAsNumber: true })}
-                  className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-6 outline-none focus:border-emerald-500 transition-colors"
-                />
-              </motion.div>
-            )}
-
-            {reportType === 'incident' && (
-              <motion.div 
-                key="incident-fields"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-red-50/50 rounded-3xl border border-red-100"
-              >
-                <label className="text-sm font-bold text-red-900 block">Severity Level</label>
-                <select 
-                  {...register('severity')}
-                  className="w-full bg-white border border-red-100 rounded-2xl py-3 px-6 outline-none focus:border-red-500 transition-colors font-medium text-red-900"
-                >
-                  <option value="low">Low (Procedural issue)</option>
-                  <option value="medium">Medium (Delays / Disputes)</option>
-                  <option value="high">High (Suppression / Harassment)</option>
-                  <option value="critical">Critical (Violence / Disruption)</option>
-                </select>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        )}
 
         <button
           disabled={isSubmitting}
           className={`w-full py-6 px-10 rounded-[28px] font-bold text-xl flex items-center justify-center gap-4 transition-all duration-300 shadow-xl ${
-            isSubmitting 
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
+            isSubmitting
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
               : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 active:scale-[0.98]'
           }`}
         >

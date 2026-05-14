@@ -8,6 +8,8 @@ import Dashboard from './pages/Dashboard';
 import Report from './pages/Report';
 import Reports from './pages/Reports';
 import FieldReportsFeed from './pages/FieldReportsFeed';
+import FormBuilder from './pages/FormBuilder';
+import ObserverOnboarding from './pages/ObserverOnboarding';
 import EditReport from './pages/EditReport';
 import Incidents from './pages/Incidents';
 import IncidentDetail from './pages/IncidentDetail';
@@ -42,6 +44,8 @@ function AppRoutes() {
         <Route path="report" element={<Report />} />
         <Route path="reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
         <Route path="field-reports" element={<ProtectedRoute><FieldReportsFeed /></ProtectedRoute>} />
+        <Route path="observers/onboard" element={<ProtectedRoute adminOnly><ObserverOnboarding /></ProtectedRoute>} />
+        <Route path="form-builder" element={<ProtectedRoute adminOnly><FormBuilder /></ProtectedRoute>} />
         <Route path="reports/:id/edit" element={<ProtectedRoute adminOnly><EditReport /></ProtectedRoute>} />
         <Route path="incidents" element={<Incidents />} />
         <Route path="incidents/:id" element={<IncidentDetail />} />

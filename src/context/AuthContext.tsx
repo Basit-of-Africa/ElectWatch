@@ -82,15 +82,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const specialId = normalizeSpecialId(rawSpecialId);
     if (!specialId) throw new Error('Enter your special ID.');
 
+    const demoUser = getDemoUser(specialId);
+    let credential: FirebaseUser | null = auth.currentUser;
+    if (!demoUser && !credential) {
+      credential = (await signInAnonymously(auth)).user;
+    }
+
     const profile = await findUserBySpecialId(specialId);
     if (!profile) {
       await signOut(auth);
       throw new Error('Special ID not recognized.');
     }
 
-    const demoUser = getDemoUser(specialId);
     let uid = demoUser ? `demo-${specialId.toLowerCase()}` : auth.currentUser?.uid;
-    let credential: FirebaseUser | null = auth.currentUser;
 
     try {
       credential = auth.currentUser || (await signInAnonymously(auth)).user;

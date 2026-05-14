@@ -24,7 +24,7 @@ import { motion } from 'motion/react';
 
 const editReportSchema = z.object({
   pollingUnitId: z.string().min(1, 'Polling unit is required'),
-  type: z.enum(['accreditation', 'incident', 'result']),
+  type: z.enum(['accreditation', 'incident', 'result', 'checklist']),
   description: z.string().optional(),
   voterTurnout: z.string().optional(),
   results: z.string().optional(),

@@ -124,7 +124,7 @@ export default function PublicDashboard() {
                 <Radio className="w-4 h-4 text-emerald-400" />
                 Live public signal
               </div>
-              <h1 className="mt-8 text-4xl md:text-6xl font-bold font-serif italic tracking-tight">
+              <h1 className="mt-8 text-4xl md:text-6xl font-bold font-serif tracking-tight">
                 Election field status, visible to everyone.
               </h1>
               <p className="mt-5 text-emerald-100/80 text-lg max-w-2xl leading-relaxed">
@@ -187,7 +187,7 @@ export default function PublicDashboard() {
         <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-8 border-b border-gray-50 flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 font-serif italic">Recent Public Incident Feed</h2>
+              <h2 className="text-2xl font-bold text-gray-900 font-serif">Recent Public Incident Feed</h2>
               <p className="text-gray-500 mt-1 text-sm">Showing latest verified incident records available to the public view.</p>
             </div>
           </div>

@@ -49,7 +49,7 @@ export default function MapPage() {
     <div className="h-[calc(100vh-160px)] flex flex-col gap-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 tracking-tight font-serif italic">Tactical Map</h1>
+          <h1 className="text-4xl font-bold text-gray-900 tracking-tight font-serif">Tactical Map</h1>
           <p className="text-gray-500 mt-2 text-lg font-medium">Real-time geographic visualization of field operations.</p>
         </div>
         <div className="flex items-center gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">

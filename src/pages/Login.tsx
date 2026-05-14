@@ -44,7 +44,7 @@ export default function Login() {
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-5xl font-bold leading-tight font-serif italic"
+            className="text-5xl font-bold leading-tight font-serif"
           >
             Verified election personnel only.
           </motion.h1>
