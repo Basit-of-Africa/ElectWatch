@@ -1,6 +1,9 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
 import NotificationCenter from './NotificationCenter';
+import OfflineSyncBanner from './OfflineSyncBanner';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -12,10 +15,7 @@ import {
   Vote,
   Map as MapIcon,
   Wifi,
-  WifiOff,
-  Radio,
-  ClipboardList,
-  UserPlus
+  WifiOff
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,7 +23,7 @@ import { onSnapshotsInSync } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export default function Layout() {
-  const { user, isAdmin, isSupervisor, logout } = useAuth();
+  const { user, isAdmin, isSupervisor } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -48,20 +48,17 @@ export default function Layout() {
   }, []);
 
   const navigation = [
-    { name: 'Dashboard', href: '/app', icon: LayoutDashboard },
-    { name: 'Incident Map', href: '/app/map', icon: MapIcon },
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Incident Map', href: '/map', icon: MapIcon },
     // Administrators and supervisors can see all reports
-    ...(isAdmin || isSupervisor ? [{ name: 'Reports', href: '/app/reports', icon: FileText }] : []),
-    ...(isAdmin || isSupervisor ? [{ name: 'Field Feed', href: '/app/field-reports', icon: Radio }] : []),
-    ...(isAdmin ? [{ name: 'Onboard Observers', href: '/app/observers/onboard', icon: UserPlus }] : []),
-    ...(isAdmin ? [{ name: 'Form Builder', href: '/app/form-builder', icon: ClipboardList }] : []),
+    ...(isAdmin || isSupervisor ? [{ name: 'Reports', href: '/reports', icon: FileText }] : []),
     // Only common observers and admins can submit reports in this model
-    ...(!isSupervisor ? [{ name: 'Report', href: '/app/report', icon: FilePlus }] : []),
-    { name: 'Incidents', href: '/app/incidents', icon: AlertTriangle },
+    ...(!isSupervisor ? [{ name: 'Report', href: '/report', icon: FilePlus }] : []),
+    { name: 'Incidents', href: '/incidents', icon: AlertTriangle },
   ];
 
   const handleSignOut = () => {
-    logout();
+    signOut(auth);
   };
 
   const getRoleLabel = () => {
@@ -207,6 +204,8 @@ export default function Layout() {
              <NotificationCenter />
           </div>
         </header>
+
+        <OfflineSyncBanner />
 
         <div className="p-6 md:p-10 lg:p-12 max-w-7xl mx-auto w-full">
           <Outlet />

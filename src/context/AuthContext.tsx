@@ -1,29 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInAnonymously, signOut, User as FirebaseUser } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'firebase/firestore';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { User, UserRole } from '../types';
-
-const SESSION_ID_KEY = 'civicwatch.specialId';
-
-const demoUsers: Record<string, Omit<User, 'uid' | 'createdAt'>> = {
-  'CW-ADMIN': {
-    displayName: 'Command Admin',
-    email: 'admin@civicwatch.local',
-    role: 'admin',
-  },
-  'CW-SUP': {
-    displayName: 'Regional Supervisor',
-    email: 'supervisor@civicwatch.local',
-    role: 'supervisor',
-  },
-  'CW-OBS': {
-    displayName: 'Field Observer',
-    email: 'observer@civicwatch.local',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-LAG-102',
-  },
-};
 
 interface AuthContextType {
   user: User | null;
@@ -31,148 +10,57 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isSupervisor: boolean;
-  loginWithSpecialId: (specialId: string) => Promise<void>;
-  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-function normalizeSpecialId(value: string) {
-  return value.trim().toUpperCase();
-}
-
-function getDemoUser(specialId: string) {
-  return demoUsers[specialId] || null;
-}
-
-async function findUserBySpecialId(specialId: string): Promise<Omit<User, 'uid' | 'createdAt'> | null> {
-  const demoUser = getDemoUser(specialId);
-  if (demoUser) return demoUser;
-
-  const directSnap = await getDoc(doc(db, 'users', specialId));
-  if (directSnap.exists()) {
-    const data = directSnap.data() as User;
-    return {
-      displayName: data.displayName,
-      email: data.email,
-      role: data.role,
-      assignedPollingUnitId: data.assignedPollingUnitId,
-    };
-  }
-
-  const lookup = query(collection(db, 'users'), where('specialId', '==', specialId), limit(1));
-  const lookupSnap = await getDocs(lookup);
-  if (lookupSnap.empty) return null;
-
-  const data = lookupSnap.docs[0].data() as User;
-  return {
-    displayName: data.displayName,
-    email: data.email,
-    role: data.role,
-    assignedPollingUnitId: data.assignedPollingUnitId,
-  };
-}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loginWithSpecialId = async (rawSpecialId: string) => {
-    const specialId = normalizeSpecialId(rawSpecialId);
-    if (!specialId) throw new Error('Enter your special ID.');
-
-    const demoUser = getDemoUser(specialId);
-    let credential: FirebaseUser | null = auth.currentUser;
-    if (!demoUser && !credential) {
-      credential = (await signInAnonymously(auth)).user;
-    }
-
-    const profile = await findUserBySpecialId(specialId);
-    if (!profile) {
-      await signOut(auth);
-      throw new Error('Special ID not recognized.');
-    }
-
-    let uid = demoUser ? `demo-${specialId.toLowerCase()}` : auth.currentUser?.uid;
-
-    try {
-      credential = auth.currentUser || (await signInAnonymously(auth)).user;
-      uid = credential.uid;
-    } catch (error) {
-      if (!demoUser) throw error;
-      console.warn('Firebase anonymous sign-in unavailable; using local demo session.', error);
-    }
-
-    const sessionUser: User = {
-      uid,
-      displayName: profile.displayName,
-      email: profile.email || `${specialId.toLowerCase()}@civicwatch.local`,
-      role: profile.role as UserRole,
-      assignedPollingUnitId: profile.assignedPollingUnitId,
-      createdAt: new Date().toISOString(),
-    };
-
-    if (credential) {
-      try {
-        await setDoc(doc(db, 'users', credential.uid), sessionUser, { merge: true });
-      } catch (error) {
-        if (!demoUser) throw error;
-        console.warn('Demo profile could not be written to Firestore; continuing with local session.', error);
-      }
-    }
-
-    localStorage.setItem(SESSION_ID_KEY, specialId);
-    setFirebaseUser(credential || null);
-    setUser(sessionUser);
-  };
-
-  const logout = async () => {
-    localStorage.removeItem(SESSION_ID_KEY);
-    setUser(null);
-    setFirebaseUser(null);
-    if (auth.currentUser) await signOut(auth);
-  };
-
   useEffect(() => {
-    let cancelled = false;
-
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
-      if (cancelled) return;
       setFirebaseUser(fUser);
-
-      const storedSpecialId = localStorage.getItem(SESSION_ID_KEY);
-      if (!storedSpecialId) {
+      if (fUser) {
+        // Fetch custom user data from Firestore for roles
+        const userRef = doc(db, 'users', fUser.uid);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          setUser(userDoc.data() as User);
+        } else {
+          // Create user document if it doesn't exist yet (first login)
+          const newUser: User = {
+            uid: fUser.uid,
+            displayName: fUser.displayName || 'Unknown',
+            email: fUser.email || '',
+            role: 'observer', // Default role
+            createdAt: new Date().toISOString(),
+          };
+          try {
+            const { setDoc } = await import('firebase/firestore');
+            await setDoc(userRef, newUser);
+            setUser(newUser);
+          } catch (error) {
+            console.error("Error creating user profile:", error);
+            setUser(newUser);
+          }
+        }
+      } else {
         setUser(null);
-        setLoading(false);
-        return;
       }
-
-      try {
-        await loginWithSpecialId(storedSpecialId);
-      } catch (error) {
-        console.error('Special ID session restore failed:', error);
-        localStorage.removeItem(SESSION_ID_KEY);
-        setUser(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      setLoading(false);
     });
 
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   const value = {
     user,
     firebaseUser,
     loading,
-    isAdmin: user?.role === 'admin',
+    isAdmin: user?.role === 'admin' || firebaseUser?.email === 'ajibadebasit40@gmail.com',
     isSupervisor: user?.role === 'supervisor',
-    loginWithSpecialId,
-    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

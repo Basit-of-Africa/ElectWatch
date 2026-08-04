@@ -20,20 +20,10 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
     }
-    
-    // Admin check for LIST operations (avoiding get() to follow strict cost-optimization)
-    function isAdminList() {
-      return isSignedIn() && request.auth.token.email == 'ajibadebasit40@gmail.com';
-    }
 
     function isSupervisor() {
       return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'supervisor';
-    }
-
-    function isObserver() {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'observer';
     }
 
     function isOwner(userId) {
@@ -41,7 +31,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128;
     }
 
     function incoming() {
@@ -56,7 +46,7 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'role', 'email', 'displayName', 'createdAt']) &&
-             data.keys().size() <= 6 && // Allow assignedPollingUnitId
+             data.keys().size() <= 8 && // Allow assignedPollingUnitId, photoURL, etc.
              data.uid == request.auth.uid &&
              data.role in ['admin', 'supervisor', 'observer'] &&
              data.email is string && data.email.size() <= 200 &&
@@ -65,7 +55,7 @@ service cloud.firestore {
 
     function isValidReport(data) {
       return data.keys().hasAll(['pollingUnitId', 'observerId', 'timestamp', 'type', 'payload']) &&
-             data.keys().size() <= 10 && // Allow location, media, updatedAt, etc.
+             data.keys().size() <= 12 && // Allow location, media, updatedAt, etc.
              isValidId(data.pollingUnitId) &&
              data.observerId == request.auth.uid &&
              data.type in ['accreditation', 'incident', 'result'] &&
@@ -74,12 +64,12 @@ service cloud.firestore {
 
     function isValidAuditLog(data) {
       return data.keys().hasAll(['updatedBy', 'timestamp', 'changes']) &&
-             data.keys().size() <= 6;
+             data.keys().size() <= 8;
     }
 
     function isValidIncident(data) {
       return data.keys().hasAll(['reportId', 'pollingUnitId', 'severity', 'status', 'description', 'timestamp']) &&
-             data.keys().size() == 6 &&
+             data.keys().size() <= 8 &&
              isValidId(data.reportId) &&
              isValidId(data.pollingUnitId) &&
              data.severity in ['low', 'medium', 'high', 'critical'] &&
@@ -87,9 +77,14 @@ service cloud.firestore {
              data.description is string && data.description.size() <= 5000;
     }
 
+    function isValidIncidentHistory(data) {
+      return data.keys().hasAll(['status', 'updatedBy', 'timestamp']) &&
+             data.keys().size() <= 8;
+    }
+
     function isValidNotification(data) {
       return data.keys().hasAll(['userId', 'title', 'message', 'type', 'read', 'timestamp']) &&
-             data.keys().size() <= 7 && // Allow link
+             data.keys().size() <= 8 && // Allow link
              data.title is string && data.title.size() <= 200 &&
              data.message is string && data.message.size() <= 1000 &&
              data.type in ['info', 'warning', 'error', 'success'] &&
@@ -99,12 +94,9 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin(); // Switched to isAdmin() which uses get() because list is only /users/
-      allow create: if isAdmin() || (isOwner(userId) && isValidUser(incoming()));
-      allow update: if (isAdmin() || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'assignedPollingUnitId']))) && 
-                    isValidUser(incoming());
-      allow update: if isAdmin(); // Admin can change everything
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) || isAdmin();
     }
 
     match /polling_units/{unitId} {
@@ -113,44 +105,32 @@ service cloud.firestore {
     }
 
     match /reports/{reportId} {
-      // Observers list their own, Admins & Supervisors list all
-      allow list: if isAdmin() || isSupervisor() || (isSignedIn() && resource.data.observerId == request.auth.uid);
-      allow get: if isSignedIn();
-      allow create: if isSignedIn() && isValidReport(incoming()) && incoming().timestamp == request.time;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidReport(incoming());
       allow update, delete: if isAdmin();
 
       match /audit_logs/{logId} {
-        allow read: if isAdmin() || isSupervisor();
+        allow read: if isSignedIn();
         allow create: if isAdmin() && isValidAuditLog(incoming());
       }
     }
 
     match /incidents/{incidentId} {
-      // Incidents are public to all authenticated users for transparency
       allow read: if isSignedIn(); 
-      allow create: if isSignedIn() && isValidIncident(incoming()) && incoming().timestamp == request.time;
-      allow update: if isAdmin() && incoming().timestamp == request.time;
+      allow create: if isSignedIn() && isValidIncident(incoming());
+      allow update: if (isAdmin() || isSupervisor()) && isSignedIn();
       allow delete: if isAdmin();
+
+      match /history/{historyId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidIncidentHistory(incoming());
+      }
     }
 
     match /notifications/{notificationId} {
-      // List query must prove it only returns what user can see.
-      // NotificationCenter queries 'userId' in [uid, 'supervisor', 'admin'].
-      allow list: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        (resource.data.userId == 'admin' && isAdmin()) ||
-        (resource.data.userId == 'supervisor' && (isSupervisor() || isAdmin()))
-      );
-      
-      allow get: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        (resource.data.userId == 'admin' && isAdmin()) ||
-        (resource.data.userId == 'supervisor' && (isSupervisor() || isAdmin()))
-      );
-      
-      allow create: if isSignedIn() && isValidNotification(incoming()) && incoming().timestamp == request.time;
-      allow update: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin()) && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidNotification(incoming());
+      allow update: if isSignedIn();
       allow delete: if isAdmin();
     }
   }

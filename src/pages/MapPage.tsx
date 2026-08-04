@@ -31,7 +31,7 @@ export default function MapPage() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user, isAdmin, isSupervisor]);
 
   if (!GOOGLE_MAPS_API_KEY) {
     return (

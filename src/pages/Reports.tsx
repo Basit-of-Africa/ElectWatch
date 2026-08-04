@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Report, User } from '../types';
+import { Report } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { cacheFetchedReports, getCachedReports } from '../lib/offlineStorage';
 import { 
   FileText, 
   Calendar, 
@@ -21,60 +22,24 @@ import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const csvCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-
-const getReportDescription = (report: Report) => {
-  if (typeof report.payload === 'string') return report.payload;
-  return report.payload?.description || '';
-};
-
 export default function Reports() {
   const { isAdmin, isSupervisor } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
-  const [users, setUsers] = useState<Record<string, User>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const exportToCSV = () => {
-    if (!isAdmin) return;
-
-    const headers = [
-      'ID',
-      'Type',
-      'Polling Unit',
-      'Observer ID',
-      'Observer Name',
-      'Observer Email',
-      'Description',
-      'Voter Count',
-      'Severity',
-      'Latitude',
-      'Longitude',
-      'Media Count',
-      'Timestamp'
-    ];
+    const headers = ['ID', 'Type', 'Polling Unit', 'Timestamp'];
     const csvContent = [
       headers.join(','),
-      ...filteredReports.map(r => {
-        const observer = users[r.observerId];
-        return [
-          csvCell(r.id),
-          csvCell(r.type),
-          csvCell(r.pollingUnitId),
-          csvCell(r.observerId),
-          csvCell(observer?.displayName || 'Unknown'),
-          csvCell(observer?.email || ''),
-          csvCell(getReportDescription(r)),
-          csvCell(r.payload?.voterCount ?? ''),
-          csvCell(r.payload?.severity ?? ''),
-          csvCell(r.location?.lat ?? ''),
-          csvCell(r.location?.lng ?? ''),
-          csvCell(r.media?.length ?? 0),
-          csvCell((r.timestamp as any)?.toDate ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A')
-        ].join(',');
-      })
+      ...filteredReports.map(r => [
+        r.id,
+        r.type,
+        r.pollingUnitId,
+        (r.timestamp as any)?.toDate ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+      ].join(','))
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -90,34 +55,23 @@ export default function Reports() {
   };
 
   const exportToPDF = () => {
-    if (!isAdmin) return;
-
-    const doc = new jsPDF({ orientation: 'landscape' });
+    const doc = new jsPDF();
     doc.text('Election Field Reports', 14, 15);
     doc.setFontSize(10);
     doc.text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, 22);
-    doc.text(`Records: ${filteredReports.length}`, 14, 28);
     
-    const tableData = filteredReports.map(r => {
-      const observer = users[r.observerId];
-      return [
-        r.id.substring(0, 8),
-        r.type.toUpperCase(),
-        r.pollingUnitId,
-        observer?.displayName || 'Unknown',
-        getReportDescription(r),
-        r.payload?.severity || '',
-        r.location ? `${r.location.lat.toFixed(4)}, ${r.location.lng.toFixed(4)}` : '',
-        String(r.media?.length ?? 0),
-        (r.timestamp as any)?.toDate ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
-      ];
-    });
+    const tableData = filteredReports.map(r => [
+      r.id.substring(0, 8),
+      r.type.toUpperCase(),
+      r.pollingUnitId,
+      (r.timestamp as any)?.toDate ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+    ]);
 
     autoTable(doc, {
-      head: [['Report ID', 'Type', 'Polling Unit', 'Observer', 'Description', 'Severity', 'Location', 'Media', 'Timestamp']],
+      head: [['Report ID', 'Type', 'Polling Unit', 'Timestamp']],
       body: tableData,
-      startY: 36,
-      styles: { fontSize: 7 },
+      startY: 30,
+      styles: { fontSize: 8 },
       headStyles: { fillColor: [4, 120, 87] }
     });
 
@@ -126,34 +80,32 @@ export default function Reports() {
   };
 
   useEffect(() => {
+    const cached = getCachedReports();
+    if (cached.length > 0) {
+      setReports(cached);
+      setLoading(false);
+    }
+
     const q = query(collection(db, 'reports'), orderBy('timestamp', 'desc'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report)));
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report));
+      setReports(docs);
+      cacheFetchedReports(docs);
       setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'reports');
+      console.warn('Firestore reports snapshot failed or offline, using cached reports:', error);
+      const cachedData = getCachedReports();
+      if (cachedData.length > 0) {
+        setReports(cachedData);
+        setLoading(false);
+      } else {
+        handleFirestoreError(error, OperationType.LIST, 'reports');
+      }
     });
 
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-
-    const usersQ = query(collection(db, 'users'));
-    const unsubscribe = onSnapshot(usersQ, (snapshot) => {
-      const nextUsers = snapshot.docs.reduce((acc, userDoc) => {
-        acc[userDoc.id] = { uid: userDoc.id, ...userDoc.data() } as User;
-        return acc;
-      }, {} as Record<string, User>);
-      setUsers(nextUsers);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'users');
-    });
-
-    return () => unsubscribe();
-  }, [isAdmin]);
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.pollingUnitId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -197,43 +149,42 @@ export default function Reports() {
             <option value="result">Results</option>
           </select>
 
-          {isAdmin && (
-            <div className="relative">
-              <button
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                className="flex items-center gap-2 px-6 py-3.5 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
-              >
-                <Download className="w-4 h-4 text-emerald-600" />
-                Export
-              </button>
-              
-              <AnimatePresence>
-                {showExportMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+          {/* Export Button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2 px-6 py-3.5 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              Export
+            </button>
+            
+            <AnimatePresence>
+              {showExportMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+                >
+                  <button
+                    onClick={exportToCSV}
+                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
                   >
-                    <button
-                      onClick={exportToCSV}
-                      className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
-                    >
-                      <TableIcon className="w-4 h-4 text-emerald-600" />
-                      Export to CSV
-                    </button>
-                    <button
-                      onClick={exportToPDF}
-                      className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
-                    >
-                      <FileText className="w-4 h-4 text-emerald-600" />
-                      Export to PDF
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+                    <TableIcon className="w-4 h-4 text-emerald-600" />
+                    Export to CSV
+                  </button>
+                  <button
+                    onClick={exportToPDF}
+                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    Export to PDF
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -307,7 +258,7 @@ export default function Reports() {
                       <div className="flex items-center justify-end gap-2">
                         {isAdmin && (
                           <Link 
-                            to={`/app/reports/${report.id}/edit`}
+                            to={`/reports/${report.id}/edit`}
                             className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
                             title="Edit Report"
                           >
@@ -315,7 +266,7 @@ export default function Reports() {
                           </Link>
                         )}
                         <Link 
-                          to={`/app/incidents`} // Ideally would link to PU detail or similar if report has no detail page
+                          to={`/incidents`} // Ideally would link to PU detail or similar if report has no detail page
                           className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-900 hover:text-white transition-all shadow-sm"
                         >
                           <ChevronRight className="w-4 h-4" />

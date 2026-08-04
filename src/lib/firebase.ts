@@ -1,27 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import {
-  CACHE_SIZE_UNLIMITED,
-  doc,
-  getDocFromServer,
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-} from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = initializeFirestore(
-  app,
-  {
-    localCache: persistentLocalCache({
-      cacheSizeBytes: CACHE_SIZE_UNLIMITED,
-      tabManager: persistentMultipleTabManager(),
-    }),
-  },
-  firebaseConfig.firestoreDatabaseId
-);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export enum OperationType {
   CREATE = 'create',
@@ -72,8 +56,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Test connection as per guidelines
 async function testConnection() {
-  if (!navigator.onLine) return;
-
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
