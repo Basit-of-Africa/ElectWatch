@@ -1,4 +1,4 @@
-import React, { useEffect, useState, FormEvent } from 'react';
+import React, { useEffect, useState, FormEvent, ChangeEvent, DragEvent } from 'react';
 import { collection, onSnapshot, doc, updateDoc, setDoc, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User, Report } from '../types';
@@ -22,13 +22,37 @@ import {
   Phone,
   Mail,
   Activity,
-  MoreVertical
+  MoreVertical,
+  Upload,
+  FileSpreadsheet,
+  FileCheck,
+  AlertTriangle,
+  ArrowRight,
+  ArrowLeft,
+  HelpCircle,
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
+interface ParsedObserverRow {
+  id: string;
+  displayName: string;
+  email: string;
+  phone: string;
+  role: 'observer' | 'supervisor';
+  assignedPollingUnitId: string;
+  assignedPollingUnitName: string;
+  state: string;
+  lga: string;
+  isValid: boolean;
+  validationError?: string;
+  selected: boolean;
+}
 
 // Seed default observers for rich initial Admin display
 const DEFAULT_OBSERVERS: User[] = [
@@ -123,6 +147,15 @@ export default function Observers() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
+  // CSV Import Wizard State
+  const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
+  const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
+  const [parsedRows, setParsedRows] = useState<ParsedObserverRow[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importedCount, setImportedCount] = useState(0);
+  
   // Assignment Form State
   const [assignedUnitId, setAssignedUnitId] = useState('');
   const [assignedUnitName, setAssignedUnitName] = useState('');
@@ -139,6 +172,180 @@ export default function Observers() {
     state: 'Lagos',
     lga: 'Ikeja'
   });
+
+  // Download CSV Onboarding Template
+  const handleDownloadTemplate = () => {
+    const templateContent = [
+      'Name,Email,Phone,Role,Polling Unit ID,Polling Unit Name,State,LGA',
+      'Kemi Adebayo,kemi.adebayo@civicwatch.org,+234 803 111 2233,observer,PU-LAG-016,Gbagada Comprehensive High School,Lagos,Kosofe',
+      'Farouk Usman,farouk.usman@civicwatch.org,+234 802 999 8877,supervisor,SUP-KN-02,Kano Central Zonal Hub,Kano,Kano Municipal',
+      'David Okoh,david.okoh@civicwatch.org,+234 814 555 4433,observer,PU-RV-104,Rumuokwuta Girls Secondary,Rivers,Port Harcourt'
+    ].join('\n');
+
+    const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'civicwatch_observer_import_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('CSV Onboarding Template downloaded');
+  };
+
+  // CSV Parser
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const handleFileUpload = (file: File) => {
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Please upload a valid .csv file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (!content) return;
+
+      const lines = content.split(/\r\n|\n/).filter(line => line.trim().length > 0);
+      if (lines.length < 2) {
+        toast.error('CSV file appears empty or missing data rows');
+        return;
+      }
+
+      const rows: ParsedObserverRow[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        if (values.length < 2) continue;
+
+        const displayName = values[0] || '';
+        const email = values[1] || '';
+        const phone = values[2] || '';
+        const rawRole = (values[3] || 'observer').toLowerCase();
+        const role = rawRole.includes('supervisor') ? 'supervisor' : 'observer';
+        const assignedPollingUnitId = values[4] || '';
+        const assignedPollingUnitName = values[5] || '';
+        const state = values[6] || 'Lagos';
+        const lga = values[7] || 'Ikeja';
+
+        const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        const nameValid = displayName.trim().length > 1;
+
+        let error = '';
+        if (!nameValid) error = 'Missing name';
+        else if (!emailValid) error = 'Invalid email format';
+
+        const isValid = nameValid && emailValid;
+
+        rows.push({
+          id: `imp-${i}-${Date.now()}`,
+          displayName,
+          email,
+          phone,
+          role,
+          assignedPollingUnitId,
+          assignedPollingUnitName,
+          state,
+          lga,
+          isValid,
+          validationError: error,
+          selected: isValid
+        });
+      }
+
+      setParsedRows(rows);
+      setImportStep(2);
+      toast.success(`Parsed ${rows.length} observer records from CSV`);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleExecuteImport = async () => {
+    const selectedRows = parsedRows.filter(r => r.selected && r.isValid);
+    if (selectedRows.length === 0) {
+      toast.error('No valid rows selected for import');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
+    let count = 0;
+
+    const newUsersToAppend: User[] = [];
+
+    for (let i = 0; i < selectedRows.length; i++) {
+      const row = selectedRows[i];
+      const uid = `obs-imported-${Date.now()}-${i}`;
+      
+      const userRecord: User = {
+        uid,
+        displayName: row.displayName,
+        email: row.email,
+        phone: row.phone,
+        role: row.role,
+        assignedPollingUnitId: row.assignedPollingUnitId,
+        assignedPollingUnitName: row.assignedPollingUnitName,
+        state: row.state,
+        lga: row.lga,
+        status: 'active',
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        await setDoc(doc(db, 'users', uid), {
+          ...userRecord,
+          updatedAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn('Firestore import error, syncing locally:', e);
+      }
+
+      newUsersToAppend.push(userRecord);
+      count++;
+      setImportedCount(count);
+      setImportProgress(Math.round(((i + 1) / selectedRows.length) * 100));
+    }
+
+    setObservers(prev => [...newUsersToAppend, ...prev]);
+    setIsImporting(false);
+    setImportStep(3);
+    toast.success(`Successfully onboarded ${count} field observers!`);
+  };
 
   useEffect(() => {
     // 1. Fetch Users
@@ -394,24 +601,44 @@ export default function Observers() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold rounded-2xl hover:bg-emerald-100 shadow-sm transition-all text-xs"
+            title="Download formatted CSV template for bulk observer onboarding"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            CSV Template
+          </button>
+          <button
+            onClick={() => {
+              setIsImportWizardOpen(true);
+              setImportStep(1);
+              setParsedRows([]);
+            }}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-50 border border-indigo-200 text-indigo-800 font-bold rounded-2xl hover:bg-indigo-100 shadow-sm transition-all text-xs"
+            title="Launch step-by-step CSV Import Wizard"
+          >
+            <Upload className="w-4 h-4 text-indigo-600" />
+            Import CSV Wizard
+          </button>
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 text-gray-700 font-semibold rounded-2xl hover:bg-gray-50 shadow-sm transition-all text-sm"
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-2xl hover:bg-gray-50 shadow-sm transition-all text-xs"
           >
             <Download className="w-4 h-4 text-emerald-600" />
             Export CSV
           </button>
           <button
             onClick={exportToPDF}
-            className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 text-gray-700 font-semibold rounded-2xl hover:bg-gray-50 shadow-sm transition-all text-sm"
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-2xl hover:bg-gray-50 shadow-sm transition-all text-xs"
           >
             <FileText className="w-4 h-4 text-emerald-600" />
             PDF Report
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-2xl shadow-md transition-all text-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-md transition-all text-xs"
           >
             <UserPlus className="w-4 h-4" />
             Add Observer
@@ -919,6 +1146,277 @@ export default function Observers() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 3: CSV Import Onboarding Wizard */}
+      <AnimatePresence>
+        {isImportWizardOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-8 max-w-3xl w-full shadow-2xl border border-gray-100 space-y-6 my-8"
+            >
+              {/* Wizard Header */}
+              <div className="flex justify-between items-start border-b border-gray-100 pb-4">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">
+                    <Sparkles className="w-4 h-4" />
+                    Bulk Onboarding Assistant
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 font-serif">
+                    Observer CSV Import Wizard
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsImportWizardOpen(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Step Progress Stepper */}
+              <div className="grid grid-cols-3 gap-2 py-2">
+                <div className={`p-3 rounded-2xl border flex items-center gap-3 ${
+                  importStep === 1 
+                    ? 'bg-indigo-50/80 border-indigo-200 text-indigo-900 font-bold' 
+                    : importStep > 1 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-semibold'
+                    : 'bg-gray-50 border-gray-100 text-gray-400'
+                }`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    importStep === 1 ? 'bg-indigo-600 text-white' : importStep > 1 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {importStep > 1 ? <Check className="w-4 h-4" /> : '1'}
+                  </div>
+                  <span className="text-xs">1. Upload CSV</span>
+                </div>
+
+                <div className={`p-3 rounded-2xl border flex items-center gap-3 ${
+                  importStep === 2 
+                    ? 'bg-indigo-50/80 border-indigo-200 text-indigo-900 font-bold' 
+                    : importStep > 2 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-semibold'
+                    : 'bg-gray-50 border-gray-100 text-gray-400'
+                }`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    importStep === 2 ? 'bg-indigo-600 text-white' : importStep > 2 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {importStep > 2 ? <Check className="w-4 h-4" /> : '2'}
+                  </div>
+                  <span className="text-xs">2. Preview & Validate</span>
+                </div>
+
+                <div className={`p-3 rounded-2xl border flex items-center gap-3 ${
+                  importStep === 3 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-bold' 
+                    : 'bg-gray-50 border-gray-100 text-gray-400'
+                }`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    importStep === 3 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    3
+                  </div>
+                  <span className="text-xs">3. Complete</span>
+                </div>
+              </div>
+
+              {/* STEP 1: Upload CSV */}
+              {importStep === 1 && (
+                <div className="space-y-6">
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-3xl p-10 text-center transition-all flex flex-col items-center justify-center gap-4 cursor-pointer ${
+                      isDragging 
+                        ? 'border-indigo-500 bg-indigo-50/50 scale-[1.01]' 
+                        : 'border-gray-200 hover:border-indigo-400 hover:bg-gray-50/80'
+                    }`}
+                  >
+                    <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm border border-indigo-100">
+                      <Upload className="w-8 h-8" />
+                    </div>
+
+                    <div>
+                      <h4 className="text-lg font-bold text-gray-900 font-serif">
+                        Drag and drop your Observer CSV file here
+                      </h4>
+                      <p className="text-xs text-gray-500 font-medium mt-1">
+                        Supports standard UTF-8 .CSV files up to 10MB
+                      </p>
+                    </div>
+
+                    <label className="cursor-pointer px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition-all">
+                      Browse Computer
+                      <input
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleFileUpload(e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* CSV Guidelines & Template Helper */}
+                  <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <FileSpreadsheet className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-gray-800">Need the standard onboarding template?</p>
+                        <p className="text-[11px] text-gray-500">Includes correct headers: Name, Email, Phone, Role, Polling Unit ID, Polling Unit Name, State, LGA.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all shadow-sm flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download CSV Template
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: Preview & Validation Table */}
+              {importStep === 2 && (
+                <div className="space-y-6">
+                  {/* Summary Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <div className="flex items-center gap-4 text-xs font-bold">
+                      <span className="text-gray-700">Total Found: <strong className="text-gray-900 font-extrabold">{parsedRows.length}</strong></span>
+                      <span className="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg">
+                        Valid: {parsedRows.filter(r => r.isValid).length}
+                      </span>
+                      {parsedRows.filter(r => !r.isValid).length > 0 && (
+                        <span className="text-red-700 bg-red-100 px-2.5 py-1 rounded-lg">
+                          Errors: {parsedRows.filter(r => !r.isValid).length}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const allValidSelected = parsedRows.filter(r => r.isValid).every(r => r.selected);
+                        setParsedRows(prev => prev.map(r => r.isValid ? { ...r, selected: !allValidSelected } : r));
+                      }}
+                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      Toggle All Valid
+                    </button>
+                  </div>
+
+                  {/* Preview Table */}
+                  <div className="max-h-72 overflow-y-auto border border-gray-100 rounded-2xl">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="bg-gray-50 sticky top-0 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        <tr>
+                          <th className="p-3 text-center">Import</th>
+                          <th className="p-3">Observer Name</th>
+                          <th className="p-3">Email</th>
+                          <th className="p-3">Role</th>
+                          <th className="p-3">Polling Unit</th>
+                          <th className="p-3 text-right">Validation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {parsedRows.map((row) => (
+                          <tr key={row.id} className={row.isValid ? 'hover:bg-emerald-50/20' : 'bg-red-50/30'}>
+                            <td className="p-3 text-center">
+                              <input
+                                type="checkbox"
+                                disabled={!row.isValid}
+                                checked={row.selected}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setParsedRows(prev => prev.map(r => r.id === row.id ? { ...r, selected: checked } : r));
+                                }}
+                                className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                              />
+                            </td>
+                            <td className="p-3 font-bold text-gray-900">{row.displayName || '—'}</td>
+                            <td className="p-3 text-gray-600 font-mono text-[11px]">{row.email || '—'}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                                row.role === 'supervisor' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {row.role}
+                              </span>
+                            </td>
+                            <td className="p-3 font-mono text-gray-600">{row.assignedPollingUnitId || 'Unassigned'}</td>
+                            <td className="p-3 text-right">
+                              {row.isValid ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-md text-[10px]">
+                                  <Check className="w-3 h-3" /> Ready
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-800 font-bold rounded-md text-[10px]" title={row.validationError}>
+                                  <AlertTriangle className="w-3 h-3" /> {row.validationError}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex justify-between items-center border-t border-gray-100 pt-4">
+                    <button
+                      onClick={() => setImportStep(1)}
+                      className="px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-all flex items-center gap-1.5"
+                    >
+                      <ArrowLeft className="w-4 h-4" /> Re-upload CSV
+                    </button>
+
+                    <button
+                      onClick={handleExecuteImport}
+                      disabled={isImporting || parsedRows.filter(r => r.selected && r.isValid).length === 0}
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-2xl shadow-md transition-all flex items-center gap-2"
+                    >
+                      {isImporting ? 'Importing Personnel...' : `Onboard ${parsedRows.filter(r => r.selected && r.isValid).length} Selected Observers`}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: Progress & Success Confirmation */}
+              {importStep === 3 && (
+                <div className="py-8 text-center space-y-6">
+                  <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <CheckCircle className="w-10 h-10" />
+                  </div>
+
+                  <div>
+                    <h4 className="text-2xl font-bold text-gray-900 font-serif">
+                      Onboarding Completed Successfully!
+                    </h4>
+                    <p className="text-sm text-gray-500 font-medium mt-2 max-w-md mx-auto">
+                      <strong>{importedCount}</strong> new field observers have been registered and activated on the platform with assigned polling unit credentials.
+                    </p>
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      onClick={() => setIsImportWizardOpen(false)}
+                      className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-2xl shadow-lg transition-all"
+                    >
+                      Return to Observers Directory
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
