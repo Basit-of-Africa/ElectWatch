@@ -272,7 +272,7 @@ export default function Dashboard() {
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-amber-500 to-red-500 opacity-50" />
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
           <div>
-            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2 font-serif italic text-emerald-950">
+            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2 font-serif text-emerald-950">
               <TrendingUp className="text-emerald-600 w-6 h-6" />
               Incident Severity Trends
             </h3>
@@ -334,7 +334,7 @@ export default function Dashboard() {
           <>
             <div className="lg:col-span-2 bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
                <div className="flex justify-between items-start mb-10">
-                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif italic">
+                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif">
                    <Activity className="text-emerald-600 w-5 h-5" />
                    System Infrastructure Health
                  </h3>
@@ -369,7 +369,7 @@ export default function Dashboard() {
 
             <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm relative overflow-hidden group flex flex-col h-full">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif italic text-emerald-950">
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif text-emerald-950">
                   <ShieldAlert className="text-red-500 w-5 h-5" />
                   Tactical Alert Feed
                 </h3>
@@ -411,7 +411,7 @@ export default function Dashboard() {
             </div>
 
             <div className="lg:col-span-2 bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm">
-               <h3 className="text-xl font-bold text-gray-900 mb-8 flex items-center gap-2 font-serif italic text-indigo-950">
+               <h3 className="text-xl font-bold text-gray-900 mb-8 flex items-center gap-2 font-serif text-indigo-950">
                  <TrendingUp className="text-indigo-600 w-5 h-5" />
                  Transmission Volume
                </h3>
@@ -432,7 +432,7 @@ export default function Dashboard() {
             </div>
 
             <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm flex flex-col justify-center">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 font-serif italic text-center">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 font-serif text-center">
                 Incident Severity Matrix
               </h3>
               <div className="h-[180px] w-full">
@@ -456,7 +456,7 @@ export default function Dashboard() {
                <div className="relative z-10 space-y-8">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="text-3xl font-bold font-serif italic">Regional Intel Hub</h3>
+                      <h3 className="text-3xl font-bold font-serif">Regional Intel Hub</h3>
                       <p className="text-emerald-200 mt-2 font-medium">Monitoring local field dynamics and escalating issues.</p>
                     </div>
                     <Link to="/reports" className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-widest transition-all">
@@ -486,7 +486,7 @@ export default function Dashboard() {
 
             <div className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm h-full flex flex-col">
                 <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif italic text-emerald-950">
+                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2 font-serif text-emerald-950">
                     <Activity className="text-emerald-600 w-5 h-5" />
                     Live Regional Alerts
                   </h3>
@@ -537,7 +537,7 @@ export default function Dashboard() {
             </div>
 
             <div className="lg:col-span-3 bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm">
-               <h3 className="text-xl font-bold text-gray-900 mb-8 flex items-center gap-2 font-serif italic justify-center text-center">
+               <h3 className="text-xl font-bold text-gray-900 mb-8 flex items-center gap-2 font-serif justify-center text-center">
                  Region Performance Analytics
                </h3>
                <div className="h-[200px] w-full">
@@ -620,7 +620,7 @@ export default function Dashboard() {
             {/* Support Terminal */}
             <div className="bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm flex flex-col justify-between">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-6 font-serif italic">Operational Support</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-6 font-serif">Operational Support</h3>
                 <p className="text-gray-500 text-sm leading-relaxed mb-10 font-medium italic">
                   Direct encrypted channel to field supervisors is active. Protocol 882 applicable for all disputes.
                 </p>
@@ -646,7 +646,7 @@ export default function Dashboard() {
         {/* Unified Activity Section (Personalized per role) */}
         <div className="lg:col-span-3 bg-white p-10 rounded-[40px] border border-gray-100 shadow-sm flex flex-col relative overflow-hidden">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 relative z-10 gap-4">
-            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-3 font-serif italic">
+            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-3 font-serif">
               <Clock className="text-emerald-600 w-6 h-6" />
               {isAdmin || isSupervisor ? 'Global Transmission Feed' : 'My Recent Transmission Log'}
             </h3>
