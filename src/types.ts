@@ -8,6 +8,13 @@ export interface User {
   email: string;
   role: UserRole;
   assignedPollingUnitId?: string;
+  assignedPollingUnitName?: string;
+  phone?: string;
+  status?: 'active' | 'inactive' | 'suspended';
+  state?: string;
+  lga?: string;
+  reportsCount?: number;
+  lastActive?: string;
   createdAt: string;
 }
 

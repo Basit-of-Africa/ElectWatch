@@ -10,6 +10,7 @@ import EditReport from './pages/EditReport';
 import Incidents from './pages/Incidents';
 import IncidentDetail from './pages/IncidentDetail';
 import MapPage from './pages/MapPage';
+import Observers from './pages/Observers';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="report" element={<Report />} />
         <Route path="reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
         <Route path="reports/:id/edit" element={<ProtectedRoute adminOnly><EditReport /></ProtectedRoute>} />
+        <Route path="observers" element={<ProtectedRoute><Observers /></ProtectedRoute>} />
         <Route path="incidents" element={<Incidents />} />
         <Route path="incidents/:id" element={<IncidentDetail />} />
       </Route>
