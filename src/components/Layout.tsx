@@ -16,7 +16,8 @@ import {
   Map as MapIcon,
   Wifi,
   WifiOff,
-  Users
+  Users,
+  Globe
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,7 +50,8 @@ export default function Layout() {
   }, []);
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Public Live Feed', href: '/', icon: Globe },
     { name: 'Incident Map', href: '/map', icon: MapIcon },
     // Administrators and supervisors can see all reports and observers directory
     ...(isAdmin || isSupervisor ? [

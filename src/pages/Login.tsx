@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Vote, ShieldCheck, Mail, LogIn } from 'lucide-react';
+import { Vote, ShieldCheck, Mail, LogIn, Globe, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ export default function Login() {
         });
       }
       
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to sign in');
@@ -49,9 +49,17 @@ export default function Login() {
       {/* Left side: branding/imagery */}
       <div className="hidden lg:flex flex-col justify-between p-12 bg-emerald-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1540910419892-f39a62a1bf3d?q=80&w=2070&auto=format&fit=crop')] opacity-10 bg-cover bg-center" />
-        <div className="relative z-10 flex items-center gap-3">
-          <Vote className="w-8 h-8 text-emerald-400" />
-          <span className="text-2xl font-bold tracking-tight">CivicWatch.</span>
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Vote className="w-8 h-8 text-emerald-400" />
+            <span className="text-2xl font-bold tracking-tight">CivicWatch.</span>
+          </div>
+          <Link
+            to="/"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-800/80 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition-all border border-emerald-700"
+          >
+            <Globe className="w-4 h-4 text-emerald-400" /> Public Live Feed
+          </Link>
         </div>
         
         <div className="relative z-10">
@@ -78,7 +86,16 @@ export default function Login() {
       </div>
 
       {/* Right side: login form */}
-      <div className="flex flex-col justify-center items-center p-8 bg-gray-50">
+      <div className="flex flex-col justify-center items-center p-8 bg-gray-50 relative">
+        <div className="absolute top-6 left-6 lg:hidden">
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-emerald-700"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Public Feed
+          </Link>
+        </div>
+
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -86,7 +103,7 @@ export default function Login() {
         >
           <div className="text-center mb-10">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Observer Sign In</h1>
-            <p className="text-gray-500 mt-2">Access your reporting dashboard</p>
+            <p className="text-gray-500 mt-2">Access your reporting workspace</p>
           </div>
 
           {error && (
@@ -104,6 +121,13 @@ export default function Login() {
               <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" />
               {loading ? 'Authenticating...' : 'Continue with Google'}
             </button>
+
+            <Link
+              to="/"
+              className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-3 px-6 rounded-2xl transition-all text-xs border border-gray-200"
+            >
+              <Globe className="w-4 h-4 text-emerald-600" /> View Public Live Dashboard (No Login)
+            </Link>
             
             <div className="flex items-center gap-4 text-gray-400 text-xs font-medium uppercase tracking-widest my-8">
               <div className="h-px flex-1 bg-gray-100" />

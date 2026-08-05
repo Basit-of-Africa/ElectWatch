@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Report from './pages/Report';
@@ -18,7 +19,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (adminOnly && !isAdmin) return <Navigate to="/" />;
+  if (adminOnly && !isAdmin) return <Navigate to="/dashboard" />;
 
   return <>{children}</>;
 }
@@ -26,24 +27,30 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 function AppRoutes() {
   return (
     <Routes>
+      {/* Public Landing Page */}
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
+
+      {/* Authenticated Workspace Routes */}
       <Route
-        path="/"
         element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="map" element={<MapPage />} />
-        <Route path="report" element={<Report />} />
-        <Route path="reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-        <Route path="reports/:id/edit" element={<ProtectedRoute adminOnly><EditReport /></ProtectedRoute>} />
-        <Route path="observers" element={<ProtectedRoute><Observers /></ProtectedRoute>} />
-        <Route path="incidents" element={<Incidents />} />
-        <Route path="incidents/:id" element={<IncidentDetail />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/map" element={<MapPage />} />
+        <Route path="/report" element={<Report />} />
+        <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+        <Route path="/reports/:id/edit" element={<ProtectedRoute adminOnly><EditReport /></ProtectedRoute>} />
+        <Route path="/observers" element={<ProtectedRoute><Observers /></ProtectedRoute>} />
+        <Route path="/incidents" element={<Incidents />} />
+        <Route path="/incidents/:id" element={<IncidentDetail />} />
       </Route>
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
