@@ -1,5 +1,5 @@
 {
-  "name": "CivicWatch: Election Monitoring System",
+  "name": "ElectionMonitor",
   "description": "A lightweight, robust election monitoring platform for real-time observation, reporting, and data visualization.",
   "requestFramePermissions": ["camera", "geolocation"],
   "majorCapabilities": ["Real-time data synchronization", "Observer incident reporting", "Geospatial visualization"]
