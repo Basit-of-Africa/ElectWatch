@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
-import { User, UserRole } from '../types';
+import { auth } from '../lib/firebase';
+import { User } from '../types';
+import { authenticateAndAuthorizeUser, PRIMARY_ADMIN_EMAIL } from '../lib/observerAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +10,8 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isSupervisor: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,33 +20,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const clearAuthError = () => setAuthError(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
       setFirebaseUser(fUser);
       if (fUser) {
-        // Fetch custom user data from Firestore for roles
-        const userRef = doc(db, 'users', fUser.uid);
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
-          setUser(userDoc.data() as User);
-        } else {
-          // Create user document if it doesn't exist yet (first login)
-          const newUser: User = {
-            uid: fUser.uid,
-            displayName: fUser.displayName || 'Unknown',
-            email: fUser.email || '',
-            role: 'observer', // Default role
-            createdAt: new Date().toISOString(),
-          };
-          try {
-            const { setDoc } = await import('firebase/firestore');
-            await setDoc(userRef, newUser);
-            setUser(newUser);
-          } catch (error) {
-            console.error("Error creating user profile:", error);
-            setUser(newUser);
-          }
+        try {
+          const authorizedUser = await authenticateAndAuthorizeUser(fUser);
+          setUser(authorizedUser);
+          setAuthError(null);
+        } catch (error: any) {
+          console.warn("Auth check failed:", error.message);
+          setUser(null);
+          setFirebaseUser(null);
+          setAuthError(error.message || 'Access Denied: Only imported observers can log in.');
         }
       } else {
         setUser(null);
@@ -59,8 +51,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     firebaseUser,
     loading,
-    isAdmin: user?.role === 'admin' || firebaseUser?.email === 'ajibadebasit40@gmail.com',
+    isAdmin: user?.role === 'admin' || firebaseUser?.email === PRIMARY_ADMIN_EMAIL,
     isSupervisor: user?.role === 'supervisor',
+    authError,
+    clearAuthError,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

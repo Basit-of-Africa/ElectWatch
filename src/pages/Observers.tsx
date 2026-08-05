@@ -314,14 +314,14 @@ export default function Observers() {
       
       const userRecord: User = {
         uid,
-        displayName: row.displayName,
-        email: row.email,
-        phone: row.phone,
+        displayName: row.displayName.trim(),
+        email: row.email.trim(),
+        phone: row.phone.trim(),
         role: row.role,
-        assignedPollingUnitId: row.assignedPollingUnitId,
-        assignedPollingUnitName: row.assignedPollingUnitName,
-        state: row.state,
-        lga: row.lga,
+        assignedPollingUnitId: row.assignedPollingUnitId.trim(),
+        assignedPollingUnitName: row.assignedPollingUnitName.trim(),
+        state: row.state.trim(),
+        lga: row.lga.trim(),
         status: 'active',
         createdAt: new Date().toISOString()
       };
@@ -485,14 +485,14 @@ export default function Observers() {
     const generatedUid = `obs-${Date.now()}`;
     const newRecord: User = {
       uid: generatedUid,
-      displayName: newObserver.displayName,
-      email: newObserver.email,
-      phone: newObserver.phone,
+      displayName: newObserver.displayName.trim(),
+      email: newObserver.email.trim(),
+      phone: newObserver.phone.trim(),
       role: newObserver.role,
-      assignedPollingUnitId: newObserver.assignedPollingUnitId,
-      assignedPollingUnitName: newObserver.assignedPollingUnitName,
-      state: newObserver.state,
-      lga: newObserver.lga,
+      assignedPollingUnitId: newObserver.assignedPollingUnitId.trim(),
+      assignedPollingUnitName: newObserver.assignedPollingUnitName.trim(),
+      state: newObserver.state.trim(),
+      lga: newObserver.lga.trim(),
       status: 'active',
       createdAt: new Date().toISOString()
     };

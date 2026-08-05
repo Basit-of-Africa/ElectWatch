@@ -1,44 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth, db } from '../lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Vote, ShieldCheck, Mail, LogIn, Globe, ArrowLeft } from 'lucide-react';
+import { auth } from '../lib/firebase';
+import { Vote, ShieldCheck, Mail, Globe, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
+import { authenticateAndAuthorizeUser } from '../lib/observerAuth';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { authError, clearAuthError, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
+    clearAuthError();
+
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      const { user } = result;
+      const { user: firebaseUser } = result;
 
-      // Check if user exists in our Firestore
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        // Create a new user record
-        await setDoc(userRef, {
-          uid: user.uid,
-          displayName: user.displayName,
-          email: user.email,
-          role: 'observer', // Default role
-          createdAt: new Date().toISOString(),
-          updatedAt: serverTimestamp(),
-        });
-      }
+      // Authorize that user's email is in the imported roster or admin
+      await authenticateAndAuthorizeUser(firebaseUser);
       
       navigate('/dashboard');
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to sign in');
+      console.error("Login authorization error:", err);
+      setError(err.message || 'Access Denied: Only imported observer emails can log in.');
     } finally {
       setLoading(false);
     }
@@ -101,16 +104,27 @@ export default function Login() {
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md bg-white p-10 rounded-[32px] shadow-sm border border-gray-100"
         >
-          <div className="text-center mb-10">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Observer Sign In</h1>
-            <p className="text-gray-500 mt-2">Access your reporting workspace</p>
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight font-serif">Observer Sign In</h1>
+            <p className="text-gray-500 mt-2 text-sm font-medium">Access your election reporting workspace</p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-2xl border border-red-100 animate-pulse">
-              {error}
+            <div className="mb-6 p-4 bg-red-50 text-red-800 text-xs font-medium rounded-2xl border border-red-200 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-red-900">Observer Roster Verification Failed</p>
+                <p className="leading-relaxed">{error}</p>
+              </div>
             </div>
           )}
+
+          <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-4 mb-6 text-xs text-amber-900 leading-relaxed">
+            <p className="font-bold mb-1 flex items-center gap-1.5 text-amber-800">
+              <ShieldCheck className="w-4 h-4 text-amber-600" /> Authorized Personnel Requirement
+            </p>
+            Only email addresses that have been imported into the Observer Directory (via CSV Template or Admin Registration) can log in as field observers.
+          </div>
 
           <div className="space-y-4">
             <button
@@ -119,24 +133,24 @@ export default function Login() {
               className="w-full flex items-center justify-center gap-4 bg-white border-2 border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/10 text-gray-700 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 disabled:opacity-50 group"
             >
               <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" />
-              {loading ? 'Authenticating...' : 'Continue with Google'}
+              {loading ? 'Verifying Authorization...' : 'Continue with Google'}
             </button>
 
             <Link
               to="/"
               className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-3 px-6 rounded-2xl transition-all text-xs border border-gray-200"
             >
-              <Globe className="w-4 h-4 text-emerald-600" /> View Public Live Dashboard (No Login)
+              <Globe className="w-4 h-4 text-emerald-600" /> View Public Live Dashboard (No Login Required)
             </Link>
             
-            <div className="flex items-center gap-4 text-gray-400 text-xs font-medium uppercase tracking-widest my-8">
+            <div className="flex items-center gap-4 text-gray-400 text-[10px] font-bold uppercase tracking-widest my-6">
               <div className="h-px flex-1 bg-gray-100" />
-              Authorized Personnel Only
+              Imported Observer Roster Security
               <div className="h-px flex-1 bg-gray-100" />
             </div>
 
-            <p className="text-center text-xs text-gray-400 leading-relaxed px-4">
-              By continuing, you agree to our terms of service and acknowledge that all reports submitted are subject to audit and verification.
+            <p className="text-center text-[11px] text-gray-400 leading-relaxed px-2">
+              If your email is not yet registered, contact your regional election supervisor or administrator to be added to the CSV Observer roster.
             </p>
           </div>
         </motion.div>

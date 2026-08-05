@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Report, User } from '../types';
+import { User } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import {
@@ -33,8 +33,28 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
+// Dedicated display interface for the public live feed
+export interface PublicDisplayReport {
+  id: string;
+  pollingUnitId: string;
+  pollingUnitName?: string;
+  observerId?: string;
+  observerName?: string;
+  type: 'accreditation' | 'incident' | 'result' | 'warning' | 'normal' | 'info';
+  state?: string;
+  lga?: string;
+  ward?: string;
+  details: string;
+  turnout?: string;
+  security?: string;
+  accreditation?: string;
+  materials?: string;
+  incidents?: string;
+  timestamp: string;
+}
+
 // Seed sample reports for public demonstration if Firestore has low initial entries
-const PUBLIC_SEED_REPORTS: Report[] = [
+const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
   {
     id: 'RPT-1001',
     observerId: 'obs-lagos-01',
@@ -50,7 +70,7 @@ const PUBLIC_SEED_REPORTS: Report[] = [
     security: 'Peaceful',
     accreditation: 'Smooth',
     materials: 'Complete',
-    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString()
+    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString()
   },
   {
     id: 'RPT-1002',
@@ -68,7 +88,7 @@ const PUBLIC_SEED_REPORTS: Report[] = [
     accreditation: 'Delayed',
     materials: 'Incomplete',
     incidents: 'Missing ballot box seal',
-    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString()
+    timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString()
   },
   {
     id: 'RPT-1003',
@@ -85,7 +105,7 @@ const PUBLIC_SEED_REPORTS: Report[] = [
     security: 'Peaceful',
     accreditation: 'Smooth',
     materials: 'Complete',
-    createdAt: new Date(Date.now() - 1000 * 60 * 42).toISOString()
+    timestamp: new Date(Date.now() - 1000 * 60 * 42).toISOString()
   },
   {
     id: 'RPT-1004',
@@ -103,7 +123,7 @@ const PUBLIC_SEED_REPORTS: Report[] = [
     accreditation: 'Delayed',
     materials: 'Complete',
     incidents: 'Overcrowding outside perimeter',
-    createdAt: new Date(Date.now() - 1000 * 60 * 58).toISOString()
+    timestamp: new Date(Date.now() - 1000 * 60 * 58).toISOString()
   },
   {
     id: 'RPT-1005',
@@ -120,7 +140,7 @@ const PUBLIC_SEED_REPORTS: Report[] = [
     security: 'Peaceful',
     accreditation: 'Smooth',
     materials: 'Complete',
-    createdAt: new Date(Date.now() - 1000 * 60 * 75).toISOString()
+    timestamp: new Date(Date.now() - 1000 * 60 * 75).toISOString()
   },
   {
     id: 'RPT-1006',
@@ -137,7 +157,7 @@ const PUBLIC_SEED_REPORTS: Report[] = [
     security: 'Peaceful',
     accreditation: 'Smooth',
     materials: 'Complete',
-    createdAt: new Date(Date.now() - 1000 * 60 * 95).toISOString()
+    timestamp: new Date(Date.now() - 1000 * 60 * 95).toISOString()
   }
 ];
 
@@ -169,9 +189,49 @@ const SAMPLE_HEATMAP_CELLS = [
   { id: 24, name: 'PU-ZA-019', state: 'Zamfara', status: 'normal', label: 'Normal' },
 ];
 
+function parseFirestoreReport(doc: any): PublicDisplayReport {
+  const payload = doc.payload || {};
+  let timestampStr = new Date().toISOString();
+  if (doc.timestamp) {
+    if (typeof doc.timestamp === 'object' && 'toDate' in doc.timestamp) {
+      timestampStr = doc.timestamp.toDate().toISOString();
+    } else {
+      timestampStr = String(doc.timestamp);
+    }
+  }
+
+  const detailsText = typeof payload === 'string'
+    ? payload
+    : (payload.description || payload.details || 'Observation reported from field.');
+
+  let reportType: PublicDisplayReport['type'] = 'normal';
+  if (doc.type === 'incident') reportType = 'incident';
+  else if (doc.type === 'accreditation') reportType = 'accreditation';
+  else if (doc.type === 'result') reportType = 'info';
+
+  return {
+    id: doc.id,
+    pollingUnitId: doc.pollingUnitId || payload.pollingUnitId || 'PU-FIELD',
+    pollingUnitName: payload.pollingUnitName || payload.pu || doc.pollingUnitId || 'Polling Unit',
+    observerId: doc.observerId || 'obs-anon',
+    observerName: payload.observerName || payload.observer || 'Accredited Observer',
+    type: reportType,
+    state: payload.state || 'National',
+    lga: payload.lga || '',
+    ward: payload.ward || '',
+    details: detailsText,
+    turnout: payload.turnout || 'Moderate',
+    security: payload.security || 'Peaceful',
+    accreditation: payload.accreditation || 'Smooth',
+    materials: payload.materials || 'Complete',
+    incidents: payload.incidents || (doc.type === 'incident' ? detailsText : undefined),
+    timestamp: timestampStr,
+  };
+}
+
 export default function LandingPage() {
-  const { user, isAdmin, isSupervisor } = useAuth();
-  const [reports, setReports] = useState<Report[]>([]);
+  const { user } = useAuth();
+  const [reports, setReports] = useState<PublicDisplayReport[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -189,16 +249,16 @@ export default function LandingPage() {
 
     // 2. Fetch Live Reports from Firestore
     const unsubscribeReports = onSnapshot(collection(db, 'reports'), (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report));
-      
+      const parsedDocs = snapshot.docs.map(doc => parseFirestoreReport({ id: doc.id, ...doc.data() }));
+
       // Merge Firestore reports with public seed reports
-      const map = new Map<string, Report>();
+      const map = new Map<string, PublicDisplayReport>();
       PUBLIC_SEED_REPORTS.forEach(r => map.set(r.id, r));
-      docs.forEach(d => map.set(d.id, d));
+      parsedDocs.forEach(d => map.set(d.id, d));
 
       const sorted = Array.from(map.values()).sort((a, b) => {
-        const timeA = new Date(a.createdAt || a.timestamp || 0).getTime();
-        const timeB = new Date(b.createdAt || b.timestamp || 0).getTime();
+        const timeA = new Date(a.timestamp || 0).getTime();
+        const timeB = new Date(b.timestamp || 0).getTime();
         return timeB - timeA;
       });
 
@@ -245,7 +305,7 @@ export default function LandingPage() {
   const totalReportsCount = reports.length;
   const incidentCount = reports.filter(r => r.type === 'incident').length;
   const warningCount = reports.filter(r => r.type === 'warning').length;
-  const normalCount = reports.filter(r => r.type === 'normal').length;
+  const normalCount = reports.filter(r => r.type === 'normal' || r.type === 'accreditation').length;
   const infoCount = reports.filter(r => r.type === 'info').length;
 
   const activeObserversCount = Math.max(users.length, 18);
@@ -281,10 +341,10 @@ export default function LandingPage() {
   }, {} as Record<string, number>);
 
   const topStates = Object.entries(stateCounts)
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0))
     .slice(0, 6);
 
-  const maxStateReport = topStates[0]?.[1] || 1;
+  const maxStateReport = (Number(topStates[0]?.[1]) || 1);
 
   // Recent High Severity Alert
   const recentIncident = reports.find(r => r.type === 'incident');
@@ -292,20 +352,20 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#F7F5F0] text-gray-900 font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
       {/* 1. TOP OFFICIAL HEADER BAR */}
-      <header className="bg-[#0B3D1E] text-white border-b-4 border-[#E6B800] sticky top-0 z-50 shadow-md">
+      <header className="bg-[#0a2f1d] text-white border-b border-emerald-800/80 sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand & Crest */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#E6B800] text-[#0B3D1E] font-black flex items-center justify-center text-xl shadow-inner border-2 border-amber-300">
-              🦅
+            <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-xl shadow-md border border-emerald-500">
+              <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-base sm:text-lg tracking-tight font-serif text-white leading-tight">
-                  Nigeria Election Observation System
+                  CivicWatch Nigeria
                 </h1>
-                <span className="hidden sm:inline-block px-2 py-0.5 bg-emerald-800/80 text-emerald-200 text-[10px] font-mono font-bold uppercase rounded-md border border-emerald-700">
-                  INEC EMS
+                <span className="hidden sm:inline-block px-2 py-0.5 bg-emerald-900/80 text-emerald-300 text-[10px] font-mono font-bold uppercase rounded-md border border-emerald-700/60">
+                  PUBLIC STREAM
                 </span>
               </div>
               <p className="text-[11px] text-emerald-200/80 font-medium">
@@ -317,8 +377,8 @@ export default function LandingPage() {
           {/* Right Action & Clock */}
           <div className="flex items-center gap-4">
             {/* Live Clock Ticker */}
-            <div className="hidden md:flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono text-emerald-100">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <div className="hidden md:flex items-center gap-2 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-800/80 text-xs font-mono text-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>{format(currentTime, 'HH:mm:ss')} WAT</span>
             </div>
 
@@ -330,7 +390,7 @@ export default function LandingPage() {
                 </span>
                 <Link
                   to="/dashboard"
-                  className="flex items-center gap-2 px-4 py-2 bg-[#E6B800] hover:bg-amber-400 text-[#0B3D1E] font-extrabold text-xs rounded-xl shadow-md transition-all uppercase tracking-wider"
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md border border-emerald-500 transition-all uppercase tracking-wider"
                 >
                   <LayoutDashboard className="w-4 h-4" />
                   Go to Workspace
@@ -339,7 +399,7 @@ export default function LandingPage() {
             ) : (
               <Link
                 to="/login"
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#E6B800] hover:bg-amber-400 text-[#0B3D1E] font-extrabold text-xs sm:text-sm rounded-2xl shadow-md transition-all uppercase tracking-wider group"
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-500 transition-all uppercase tracking-wider group"
               >
                 <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 Observer / Admin Sign In
@@ -349,15 +409,15 @@ export default function LandingPage() {
         </div>
 
         {/* Sub-bar: Public Status Banner */}
-        <div className="bg-[#1B6B3A] px-4 py-1.5 text-xs font-medium text-emerald-100 border-t border-emerald-700/50 flex items-center justify-between">
+        <div className="bg-[#082316] px-4 py-1.5 text-xs font-medium text-emerald-200 border-t border-emerald-800/60 flex items-center justify-between">
           <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Radio className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
               <span className="font-bold text-white uppercase text-[10px] tracking-widest">
                 PUBLIC LIVE TRANSMISSION FEED — 2026 GENERAL ELECTIONS
               </span>
             </div>
-            <div className="hidden sm:flex items-center gap-4 text-[11px] text-emerald-200">
+            <div className="hidden sm:flex items-center gap-4 text-[11px] text-emerald-300">
               <span>Verified Observer Telemetry</span>
               <span>•</span>
               <span>36 States + FCT Coverage</span>
@@ -367,13 +427,13 @@ export default function LandingPage() {
       </header>
 
       {/* 2. HERO SECTION */}
-      <section className="bg-gradient-to-b from-[#0B3D1E] via-[#1B6B3A] to-[#0B3D1E] text-white py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#E6B800_1px,transparent_1px)] [background-size:16px_16px]" />
-        
+      <section className="bg-gradient-to-b from-[#0a2f1d] via-[#0e4227] to-[#082618] text-white py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px]" />
+
         <div className="max-w-7xl mx-auto relative z-10 space-y-6">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="max-w-3xl space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 rounded-full text-xs font-bold uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-full text-xs font-bold uppercase tracking-widest">
                 <Activity className="w-3.5 h-3.5" /> Real-Time Electoral Audit
               </div>
               <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight font-serif text-white leading-tight">
@@ -388,7 +448,7 @@ export default function LandingPage() {
             <div className="bg-white/10 backdrop-blur-md p-5 rounded-3xl border border-white/20 flex flex-col gap-3 shrink-0 sm:w-80 shadow-xl">
               <div className="flex items-center justify-between text-xs text-emerald-100 font-semibold">
                 <span>Field Deployment Status</span>
-                <span className="text-amber-300 font-mono font-bold">LIVE</span>
+                <span className="text-emerald-400 font-mono font-bold">LIVE</span>
               </div>
               <div className="text-2xl font-extrabold font-serif text-white">
                 {activeObserversCount} Observers Deployed
@@ -399,7 +459,7 @@ export default function LandingPage() {
               {!user && (
                 <Link
                   to="/login"
-                  className="mt-1 w-full text-center py-2.5 bg-white text-[#0B3D1E] hover:bg-emerald-50 font-bold text-xs rounded-xl shadow transition-all"
+                  className="mt-1 w-full text-center py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all border border-emerald-500"
                 >
                   Submit Report (Observer Login)
                 </Link>
@@ -418,10 +478,10 @@ export default function LandingPage() {
             </div>
 
             <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-300">Incidents & Warnings</span>
-              <div className="text-3xl font-extrabold font-serif text-amber-300 mt-1">{incidentCount + warningCount}</div>
-              <p className="text-[11px] text-amber-200/80 mt-1 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 text-amber-400" /> {incidentCount} High Severity
+              <span className="text-[10px] font-bold uppercase tracking-widest text-red-200">Incidents & Warnings</span>
+              <div className="text-3xl font-extrabold font-serif text-red-300 mt-1">{incidentCount + warningCount}</div>
+              <p className="text-[11px] text-red-200/80 mt-1 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 text-red-400" /> {incidentCount} High Severity
               </p>
             </div>
 
@@ -470,7 +530,7 @@ export default function LandingPage() {
                 </p>
               </div>
             </div>
-            
+
             <Link
               to={user ? "/incidents" : "/login"}
               className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-2xl shadow transition-all shrink-0 flex items-center gap-2"
@@ -573,10 +633,10 @@ export default function LandingPage() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className={`bg-white p-6 rounded-3xl border shadow-sm transition-all hover:shadow-md ${
-                        isIncident 
-                          ? 'border-red-200 bg-red-50/10' 
-                          : isWarning 
-                          ? 'border-amber-200 bg-amber-50/10' 
+                        isIncident
+                          ? 'border-red-200 bg-red-50/10'
+                          : isWarning
+                          ? 'border-amber-200 bg-amber-50/10'
                           : 'border-gray-200'
                       }`}
                     >
@@ -609,8 +669,8 @@ export default function LandingPage() {
                         {/* Relative Timestamp */}
                         <div className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" />
-                          {rpt.createdAt ? (
-                            formatDistanceToNow(new Date(rpt.createdAt), { addSuffix: true })
+                          {rpt.timestamp ? (
+                            formatDistanceToNow(new Date(rpt.timestamp), { addSuffix: true })
                           ) : (
                             'Just now'
                           )}
@@ -716,13 +776,13 @@ export default function LandingPage() {
             {/* Top Reporting States Progress Bar */}
             <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
               <h3 className="text-base font-bold text-gray-900 font-serif flex items-center gap-2 border-b border-gray-100 pb-3">
-                <BarChart3 className="w-4 h-4 text-indigo-600" />
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
                 Top Transmitting States
               </h3>
 
               <div className="space-y-3">
                 {topStates.map(([stName, count]) => {
-                  const pct = Math.round((count / maxStateReport) * 100);
+                  const pct = Math.round(((Number(count) || 0) / (Number(maxStateReport) || 1)) * 100);
                   return (
                     <div key={stName} className="space-y-1">
                       <div className="flex justify-between text-xs font-bold text-gray-700">
@@ -779,7 +839,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-emerald-500" /> Normal</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-amber-400" /> Caution</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-amber-600" /> Incident</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-orange-600" /> Incident</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-red-600" /> Critical</span>
             </div>
           </div>
@@ -789,7 +849,7 @@ export default function LandingPage() {
               const bg =
                 cell.status === 'normal' ? 'bg-emerald-500 hover:bg-emerald-600' :
                 cell.status === 'warning' ? 'bg-amber-400 hover:bg-amber-500' :
-                cell.status === 'incident' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700';
+                cell.status === 'incident' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700';
 
               return (
                 <div
@@ -812,14 +872,14 @@ export default function LandingPage() {
       </main>
 
       {/* 5. FOOTER */}
-      <footer className="bg-[#0B3D1E] text-white border-t-4 border-[#E6B800] py-8 px-4 sm:px-6 lg:px-8 mt-12">
+      <footer className="bg-[#0a2f1d] text-white border-t border-emerald-800/80 py-8 px-4 sm:px-6 lg:px-8 mt-12">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left text-xs text-emerald-200/80 font-medium">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#E6B800] text-[#0B3D1E] font-bold flex items-center justify-center text-base">
-              🦅
+            <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-base border border-emerald-500">
+              <ShieldCheck className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="font-bold text-white text-sm font-serif">Nigeria Election Observation & Monitoring System</p>
+              <p className="font-bold text-white text-sm font-serif">CivicWatch Nigeria</p>
               <p className="text-[11px] text-emerald-300/70 mt-0.5">Civilian Watch Network & Independent Electoral Transmission</p>
             </div>
           </div>
@@ -829,7 +889,7 @@ export default function LandingPage() {
             <span>•</span>
             <Link to="/login" className="hover:text-white transition-colors">Administrator Portal</Link>
             <span>•</span>
-            <span className="text-amber-300">INEC EMS 2026 Edition</span>
+            <span className="text-emerald-300">CivicWatch 2026 Edition</span>
           </div>
 
           <div className="text-[11px]">
