@@ -31,13 +31,16 @@ import {
   ArrowLeft,
   HelpCircle,
   Trash2,
-  Sparkles
+  Sparkles,
+  Compass,
+  Navigation
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import AttendanceDashboard from '../components/AttendanceDashboard';
 
 interface ParsedObserverRow {
   id: string;
@@ -135,6 +138,7 @@ const DEFAULT_OBSERVERS: User[] = [
 
 export default function Observers() {
   const { isAdmin, isSupervisor } = useAuth();
+  const [activeTab, setActiveTab] = useState<'roster' | 'attendance'>('roster');
   const [observers, setObservers] = useState<User[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -646,8 +650,38 @@ export default function Observers() {
         </div>
       </div>
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-3">
+        <button
+          onClick={() => setActiveTab('roster')}
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'roster'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Observer Directory Roster
+        </button>
+        <button
+          onClick={() => setActiveTab('attendance')}
+          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'attendance'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          <Compass className="w-4 h-4" />
+          Station Attendance & Geolocation Tracking
+        </button>
+      </div>
+
+      {activeTab === 'attendance' ? (
+        <AttendanceDashboard />
+      ) : (
+        <>
+          {/* KPI Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Registered</p>
@@ -762,6 +796,7 @@ export default function Observers() {
                 <tr className="bg-gray-50/50 border-b border-gray-100 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                   <th className="py-4 px-6">Observer Personnel</th>
                   <th className="py-4 px-6">Role & Status</th>
+                  <th className="py-4 px-6">Station Attendance</th>
                   <th className="py-4 px-6">Assigned Polling Unit</th>
                   <th className="py-4 px-6">State / LGA</th>
                   <th className="py-4 px-6 text-center">Submissions</th>
@@ -828,6 +863,33 @@ export default function Observers() {
                             {isCurrentActive ? 'Active On Duty' : isSuspended ? 'Suspended' : 'Inactive'}
                           </span>
                         </div>
+                      </td>
+
+                      {/* Station Attendance Check-in */}
+                      <td className="py-4 px-6">
+                        {obs.checkInStatus ? (
+                          <div className="space-y-0.5">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              obs.checkInStatus === 'checked_in'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : obs.checkInStatus === 'en_route'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                obs.checkInStatus === 'checked_in' ? 'bg-emerald-600 animate-pulse' : 'bg-amber-500'
+                              }`} />
+                              {obs.checkInStatus.replace('_', ' ')}
+                            </span>
+                            {obs.checkInLat && obs.checkInLng && (
+                              <div className="text-[10px] text-emerald-700 font-mono font-semibold">
+                                GPS Verified
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-gray-400 italic">Not checked in</span>
+                        )}
                       </td>
 
                       {/* Polling Unit */}
@@ -909,6 +971,8 @@ export default function Observers() {
           </div>
         )}
       </div>
+    </>
+  )}
 
       {/* MODAL 1: Assign Polling Unit */}
       <AnimatePresence>

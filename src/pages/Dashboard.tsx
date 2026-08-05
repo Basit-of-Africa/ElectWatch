@@ -41,6 +41,8 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, subDays, startOfDay, isSameDay, format } from 'date-fns';
 import { motion } from 'motion/react';
+import CheckInCard from '../components/CheckInCard';
+import AttendanceDashboard from '../components/AttendanceDashboard';
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -261,6 +263,28 @@ export default function Dashboard() {
           color={{ bg: 'bg-emerald-50', text: 'text-emerald-600' }} 
         />
       </div>
+
+      {/* Observer Geolocation Check-in Widget (Visible for Field Observers) */}
+      {!isAdmin && !isSupervisor && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <CheckInCard />
+        </motion.div>
+      )}
+
+      {/* Admin & Supervisor Attendance Dashboard */}
+      {(isAdmin || isSupervisor) && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <AttendanceDashboard />
+        </motion.div>
+      )}
 
       {/* Unified Trending Chart */}
       <motion.div 

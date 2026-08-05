@@ -2,6 +2,8 @@ import { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'supervisor' | 'observer';
 
+export type CheckInStatus = 'checked_in' | 'en_route' | 'not_checked_in';
+
 export interface User {
   uid: string;
   displayName: string;
@@ -16,6 +18,29 @@ export interface User {
   reportsCount?: number;
   lastActive?: string;
   createdAt: string;
+  checkInStatus?: CheckInStatus;
+  checkInTimestamp?: string;
+  checkInLat?: number;
+  checkInLng?: number;
+  checkInAccuracy?: number;
+  checkInNotes?: string;
+}
+
+export interface CheckInRecord {
+  id: string;
+  observerId: string;
+  observerName: string;
+  observerEmail: string;
+  pollingUnitId: string;
+  pollingUnitName: string;
+  state?: string;
+  lga?: string;
+  status: CheckInStatus;
+  timestamp: string | Timestamp;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  notes?: string;
 }
 
 export interface PollingUnit {
