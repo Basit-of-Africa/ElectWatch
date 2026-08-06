@@ -43,6 +43,7 @@ import { formatDistanceToNow, subDays, startOfDay, isSameDay, format } from 'dat
 import { motion } from 'motion/react';
 import CheckInCard from '../components/CheckInCard';
 import AttendanceDashboard from '../components/AttendanceDashboard';
+import NationalOverview from '../components/NationalOverview';
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -263,6 +264,15 @@ export default function Dashboard() {
           color={{ bg: 'bg-emerald-50', text: 'text-emerald-600' }} 
         />
       </div>
+
+      {/* National Overview Analytics Dashboard (Recharts Visualizations) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <NationalOverview />
+      </motion.div>
 
       {/* Observer Geolocation Check-in Widget (Visible for Field Observers) */}
       {!isAdmin && !isSupervisor && (
