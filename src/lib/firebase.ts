@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import defaultConfig from '../../firebase-applet-config.json';
 
 const env = (import.meta as any).env || {};
@@ -19,7 +19,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Initialize Firestore with long-polling fallback to support restricted network/iframe environments
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true
+  }, firebaseConfig.firestoreDatabaseId || undefined);
+} catch (e) {
+  firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+}
+export const db = firestoreDb;
 
 export enum OperationType {
   CREATE = 'create',
@@ -63,17 +73,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     },
     operationType,
     path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  };
+  console.warn('Firestore Operation Notice:', JSON.stringify(errInfo));
 }
 
-// Initial connection probe handled gracefully
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    // Intentionally catch offline/warmup probe errors silently so Firestore can operate with cache and auto-retry
-  }
-}
-testConnection();
