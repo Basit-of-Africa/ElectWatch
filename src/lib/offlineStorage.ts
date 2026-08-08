@@ -1,6 +1,7 @@
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { Report, Incident, ReportType, Severity } from '../types';
+import { requestBackgroundReportSync } from '../serviceWorkerRegistration';
 
 export interface PendingReport {
   clientId: string;
@@ -48,6 +49,8 @@ export const savePendingReport = (
   pendingList.unshift(newReport);
   try {
     localStorage.setItem(PENDING_REPORTS_KEY, JSON.stringify(pendingList));
+    // Trigger Service Worker Background Sync
+    requestBackgroundReportSync();
   } catch (err) {
     console.error('Failed to save pending report to localStorage', err);
   }
