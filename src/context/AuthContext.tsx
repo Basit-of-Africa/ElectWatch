@@ -16,9 +16,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const USER_CACHE_KEY = 'civicwatch_authorized_user_session';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const cached = localStorage.getItem(USER_CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -31,15 +40,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const authorizedUser = await authenticateAndAuthorizeUser(fUser);
           setUser(authorizedUser);
+          localStorage.setItem(USER_CACHE_KEY, JSON.stringify(authorizedUser));
           setAuthError(null);
         } catch (error: any) {
-          console.warn("Auth check failed:", error.message);
-          setUser(null);
-          setFirebaseUser(null);
-          setAuthError(error.message || 'Access Denied: Only imported observers can log in.');
+          console.warn("Auth re-verification check:", error.message);
+          const isExplicitDenial = error.message?.includes('Access Denied') || error.message?.includes('Account Suspended');
+
+          if (isExplicitDenial) {
+            setUser(null);
+            setFirebaseUser(null);
+            localStorage.removeItem(USER_CACHE_KEY);
+            setAuthError(error.message);
+          } else {
+            // Transient network error during refresh: preserve cached authorized user session
+            const cached = localStorage.getItem(USER_CACHE_KEY);
+            if (cached) {
+              try {
+                const parsed = JSON.parse(cached);
+                if (parsed && (parsed.uid === fUser.uid || parsed.email === fUser.email)) {
+                  setUser(parsed);
+                  setLoading(false);
+                  return;
+                }
+              } catch (e) {
+                // Ignore JSON parse error
+              }
+            }
+            setUser(null);
+            localStorage.removeItem(USER_CACHE_KEY);
+            setAuthError(error.message || 'Authentication error.');
+          }
         }
       } else {
         setUser(null);
+        localStorage.removeItem(USER_CACHE_KEY);
       }
       setLoading(false);
     });

@@ -4,6 +4,7 @@ import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import NotificationCenter from './NotificationCenter';
 import OfflineSyncBanner from './OfflineSyncBanner';
+import FirstTimeLocationPrompt from './FirstTimeLocationPrompt';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -64,6 +65,11 @@ export default function Layout() {
   ];
 
   const handleSignOut = () => {
+    try {
+      localStorage.removeItem('civicwatch_authorized_user_session');
+    } catch (e) {
+      // ignore
+    }
     signOut(auth);
   };
 
@@ -212,6 +218,7 @@ export default function Layout() {
         </header>
 
         <OfflineSyncBanner />
+        <FirstTimeLocationPrompt />
 
         <div className="p-6 md:p-10 lg:p-12 max-w-7xl mx-auto w-full">
           <Outlet />

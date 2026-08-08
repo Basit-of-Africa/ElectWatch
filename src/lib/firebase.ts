@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import defaultConfig from '../../firebase-applet-config.json';
 
@@ -19,6 +19,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
+// Explicitly configure browserLocalPersistence to preserve login state across page reloads & browser restarts
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.warn('Firebase Auth persistence setup notice:', err);
+});
 
 // Initialize Firestore with long-polling fallback to support restricted network/iframe environments
 let firestoreDb;
