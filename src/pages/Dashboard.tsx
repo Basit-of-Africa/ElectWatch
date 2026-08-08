@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, where, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Report, Incident } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -37,7 +37,9 @@ import {
   User,
   PlusCircle,
   Activity,
-  Zap
+  Zap,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { formatDistanceToNow, subDays, startOfDay, isSameDay, format } from 'date-fns';
 import { motion } from 'motion/react';
@@ -49,12 +51,93 @@ export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [isExportingCSV, setIsExportingCSV] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     incidents: 0,
     accreditation: 0,
     results: 0
   });
+
+  const exportIncidentsCSV = async () => {
+    setIsExportingCSV(true);
+    try {
+      let incidentList: Incident[] = incidents;
+      try {
+        const qSnap = await getDocs(query(collection(db, 'incidents'), orderBy('timestamp', 'desc')));
+        if (!qSnap.empty) {
+          incidentList = qSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Incident));
+        }
+      } catch (e) {
+        console.warn('Direct incidents fetch fallback to state:', e);
+      }
+
+      const reportMap: Record<string, Report> = {};
+      reports.forEach(r => { reportMap[r.id] = r; });
+
+      const headers = [
+        'Incident ID',
+        'Report ID',
+        'Polling Unit ID',
+        'Severity',
+        'Status',
+        'Description',
+        'Category',
+        'Latitude',
+        'Longitude',
+        'Timestamp'
+      ];
+
+      const csvRows = incidentList.map(inc => {
+        const matchedReport = reportMap[inc.reportId];
+        const category = matchedReport?.payload?.category || 'General Incident';
+        const lat = matchedReport?.location?.lat ?? '';
+        const lng = matchedReport?.location?.lng ?? '';
+
+        let formattedTime = 'N/A';
+        if (inc.timestamp) {
+          try {
+            const dt = (inc.timestamp as any)?.toDate ? (inc.timestamp as any).toDate() : new Date(inc.timestamp as any);
+            formattedTime = format(dt, 'yyyy-MM-dd HH:mm:ss');
+          } catch {
+            formattedTime = String(inc.timestamp);
+          }
+        }
+
+        const safeDesc = `"${(inc.description || '').replace(/"/g, '""')}"`;
+        const safeCat = `"${category.replace(/"/g, '""')}"`;
+
+        return [
+          inc.id,
+          inc.reportId || '',
+          inc.pollingUnitId || '',
+          inc.severity || 'low',
+          inc.status || 'pending',
+          safeDesc,
+          safeCat,
+          lat,
+          lng,
+          formattedTime
+        ].join(',');
+      });
+
+      const csvContent = [headers.join(','), ...csvRows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `incidents_export_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export incidents CSV:', err);
+    } finally {
+      setIsExportingCSV(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -218,22 +301,36 @@ export default function Dashboard() {
           </p>
         </div>
         
-        {/* Quick Actions for Observer */}
-        {!isAdmin && !isSupervisor && (
-          <Link 
-            to="/report" 
-            className="flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <PlusCircle className="w-5 h-5" /> Submit New Report
-          </Link>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Quick Actions for Observer */}
+          {!isAdmin && !isSupervisor && (
+            <Link 
+              to="/report" 
+              className="flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <PlusCircle className="w-5 h-5" /> Submit New Report
+            </Link>
+          )}
 
-        <div className="flex items-center gap-3 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm w-fit">
-           <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl text-sm">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             Live Sync
-           </div>
-           <p className="text-gray-400 text-[10px] font-mono px-4 uppercase tracking-widest">Active Connection</p>
+          {/* Admin & Supervisor CSV Export Button */}
+          {(isAdmin || isSupervisor) && (
+            <button
+              onClick={exportIncidentsCSV}
+              disabled={isExportingCSV}
+              className="flex items-center gap-2 px-5 py-3.5 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-2xl shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm disabled:opacity-50 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>{isExportingCSV ? 'Generating CSV...' : 'Export Incidents (CSV)'}</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-3 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm w-fit">
+             <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl text-sm">
+               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+               Live Sync
+             </div>
+             <p className="text-gray-400 text-[10px] font-mono px-4 uppercase tracking-widest">Active Connection</p>
+          </div>
         </div>
       </div>
 
@@ -293,6 +390,43 @@ export default function Dashboard() {
           transition={{ delay: 0.15 }}
         >
           <AttendanceDashboard />
+        </motion.div>
+      )}
+
+      {/* Admin Data Export Bar */}
+      {(isAdmin || isSupervisor) && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 p-8 rounded-[36px] shadow-xl text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-gray-700"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+              <FileSpreadsheet className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                  Data Analytics
+                </span>
+                <span className="text-xs text-gray-400">{incidents.length} recorded incidents</span>
+              </div>
+              <h3 className="text-xl font-bold font-serif text-white mt-1">Export Field Incident Logs</h3>
+              <p className="text-xs text-gray-300 mt-1 max-w-xl leading-relaxed">
+                Download a complete, structured CSV spreadsheet containing incident IDs, polling unit tags, severity ratings, descriptions, GPS coordinates, and timestamps for offline analysis.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={exportIncidentsCSV}
+            disabled={isExportingCSV}
+            className="px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-extrabold rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-wider shrink-0 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            {isExportingCSV ? 'Generating CSV...' : 'Download Incidents (CSV)'}
+          </button>
         </motion.div>
       )}
 

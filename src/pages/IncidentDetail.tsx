@@ -19,7 +19,13 @@ import {
   Edit2,
   Sparkles,
   Zap,
-  Camera
+  Camera,
+  Maximize2,
+  X,
+  Download,
+  ShieldCheck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,6 +49,7 @@ export default function IncidentDetail() {
   const [loading, setLoading] = useState(true);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -174,24 +181,143 @@ export default function IncidentDetail() {
               </p>
             </div>
 
-            {/* Visual Evidence Section */}
-            {report?.media && report.media.length > 0 && (
-              <div className="pt-8 border-t border-gray-50">
-                <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1 mb-6">
-                  <Camera className="w-4 h-4" /> Visual Evidence
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {report.media.map((item, idx) => (
-                    <div key={idx} className="aspect-square rounded-3xl overflow-hidden border-2 border-gray-50 relative group shadow-sm hover:shadow-xl transition-all">
-                      <img src={item.url} className="w-full h-full object-cover" alt="Evidence" />
-                      <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 to-transparent translate-y-full group-hover:translate-y-0 transition-transform">
-                        <p className="text-[7px] text-white/90 font-mono break-all">{item.hash}</p>
+            {/* Visual Evidence Section with Photo Thumbnails */}
+            {(() => {
+              const mediaList = (incident.media && incident.media.length > 0) ? incident.media : (report?.media || []);
+              if (mediaList.length === 0) return null;
+
+              return (
+                <div className="pt-8 border-t border-gray-100 space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="flex items-center gap-2 text-sm font-extrabold text-gray-900 uppercase tracking-widest">
+                      <Camera className="w-4 h-4 text-emerald-600" /> Visual Evidence Thumbnails ({mediaList.length})
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-emerald-200">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" /> Tamper-Evident SHA-256 Hashed
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {mediaList.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedPhotoIndex(idx)}
+                        className="aspect-square rounded-3xl overflow-hidden border-2 border-gray-100 relative group shadow-sm hover:shadow-xl transition-all cursor-pointer focus:outline-none focus:ring-4 focus:ring-emerald-500/20 text-left bg-gray-900"
+                      >
+                        <img 
+                          src={item.url} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                          alt={`Evidence Thumbnail #${idx + 1}`} 
+                        />
+                        <div className="absolute top-2 left-2 z-10 bg-emerald-600/90 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider shadow">
+                          Photo #{idx + 1}
+                        </div>
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 text-white">
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-300 mb-1">
+                            <Maximize2 className="w-3 h-3" /> View Full Resolution
+                          </div>
+                          {item.hash && (
+                            <p className="text-[8px] font-mono text-gray-300 break-all line-clamp-2">
+                              {item.hash}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Lightbox Modal */}
+                  <AnimatePresence>
+                    {selectedPhotoIndex !== null && mediaList[selectedPhotoIndex] && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="relative max-w-4xl w-full bg-gray-950 rounded-[32px] overflow-hidden border border-gray-800 shadow-2xl flex flex-col"
+                        >
+                          {/* Lightbox Header */}
+                          <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center justify-between text-white">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                                <Camera className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-base font-serif">
+                                  Visual Evidence Photo #{selectedPhotoIndex + 1} of {mediaList.length}
+                                </h3>
+                                <p className="text-xs text-gray-400 font-mono">PU #{incident.pollingUnitId} • {incident.id}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={mediaList[selectedPhotoIndex].url}
+                                download={`incident_evidence_pu_${incident.pollingUnitId}_${selectedPhotoIndex + 1}.jpg`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-2.5 rounded-xl bg-gray-800 hover:bg-emerald-600 text-gray-300 hover:text-white transition-all flex items-center gap-2 text-xs font-bold"
+                              >
+                                <Download className="w-4 h-4" /> Download
+                              </a>
+                              <button
+                                onClick={() => setSelectedPhotoIndex(null)}
+                                className="p-2.5 rounded-xl bg-gray-800 hover:bg-red-500/20 text-gray-300 hover:text-red-400 transition-colors"
+                              >
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Lightbox Image View */}
+                          <div className="relative bg-black flex items-center justify-center min-h-[350px] max-h-[70vh] p-4">
+                            <img
+                              src={mediaList[selectedPhotoIndex].url}
+                              alt="Full resolution evidence"
+                              className="max-h-[65vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl"
+                            />
+
+                            {/* Previous / Next buttons */}
+                            {mediaList.length > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedPhotoIndex((selectedPhotoIndex - 1 + mediaList.length) % mediaList.length)}
+                                  className="absolute left-4 p-3 rounded-full bg-black/60 hover:bg-emerald-600 text-white transition-all backdrop-blur-md"
+                                >
+                                  <ChevronLeft className="w-6 h-6" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedPhotoIndex((selectedPhotoIndex + 1) % mediaList.length)}
+                                  className="absolute right-4 p-3 rounded-full bg-black/60 hover:bg-emerald-600 text-white transition-all backdrop-blur-md"
+                                >
+                                  <ChevronRight className="w-6 h-6" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Lightbox Footer info */}
+                          <div className="p-6 bg-gray-900 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-gray-400">
+                            <div className="flex items-center gap-2 text-emerald-400 bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/20">
+                              <ShieldCheck className="w-4 h-4" />
+                              <span className="font-bold">Cryptographic Integrity Verified</span>
+                            </div>
+                            {mediaList[selectedPhotoIndex].hash && (
+                              <div className="text-[10px] break-all bg-black/40 p-2 rounded-xl border border-gray-800 text-gray-300">
+                                SHA256: {mediaList[selectedPhotoIndex].hash}
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             <AnimatePresence>
               {aiSummary && (

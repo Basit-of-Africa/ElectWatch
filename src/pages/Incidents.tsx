@@ -16,7 +16,8 @@ import {
   ShieldAlert,
   Download,
   FileText,
-  Table as TableIcon
+  Table as TableIcon,
+  Camera
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -290,6 +291,26 @@ export default function Incidents() {
                       <p className="text-gray-600 text-lg leading-relaxed max-w-3xl">
                         {incident.description}
                       </p>
+
+                      {incident.media && incident.media.length > 0 && (
+                        <div className="flex items-center gap-3 pt-1">
+                          <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 border border-emerald-200">
+                            <Camera className="w-3.5 h-3.5 text-emerald-600" /> {incident.media.length} Photo{incident.media.length > 1 ? 's' : ''} Attached
+                          </span>
+                          <div className="flex items-center gap-2 overflow-x-auto py-1">
+                            {incident.media.map((m, idx) => (
+                              <Link 
+                                key={idx} 
+                                to={`/incidents/${incident.id}`}
+                                className="w-12 h-12 rounded-xl overflow-hidden border border-emerald-100 relative group flex-shrink-0 shadow-sm hover:scale-105 transition-all"
+                                title="Click to view in Incident Detail"
+                              >
+                                <img src={m.url} className="w-full h-full object-cover" alt="Evidence Thumbnail" />
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-6 text-sm text-gray-400 font-medium">
                         <span className="flex items-center gap-1.5">

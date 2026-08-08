@@ -83,6 +83,11 @@ export interface Incident {
   status: IncidentStatus;
   description: string;
   timestamp: string | Timestamp;
+  media?: {
+    url: string;
+    type: string;
+    hash?: string;
+  }[];
 }
 
 export interface Notification {
