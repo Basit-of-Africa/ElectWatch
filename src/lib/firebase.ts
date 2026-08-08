@@ -1,7 +1,21 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import defaultConfig from '../../firebase-applet-config.json';
+
+const env = (import.meta as any).env || {};
+
+const clean = (val?: string) => val ? val.replace(/^["']|["']$/g, '').trim() : undefined;
+
+const firebaseConfig = {
+  apiKey: clean(env.VITE_FIREBASE_API_KEY) || defaultConfig.apiKey,
+  authDomain: clean(env.VITE_FIREBASE_AUTH_DOMAIN) || defaultConfig.authDomain,
+  projectId: clean(env.VITE_FIREBASE_PROJECT_ID) || defaultConfig.projectId,
+  storageBucket: clean(env.VITE_FIREBASE_STORAGE_BUCKET) || defaultConfig.storageBucket,
+  messagingSenderId: clean(env.VITE_FIREBASE_MESSAGING_SENDER_ID) || defaultConfig.messagingSenderId,
+  appId: clean(env.VITE_FIREBASE_APP_ID) || defaultConfig.appId,
+  firestoreDatabaseId: clean(env.VITE_FIREBASE_DATABASE_ID) || defaultConfig.firestoreDatabaseId,
+};
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
