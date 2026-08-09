@@ -61,7 +61,7 @@ const NIGERIAN_STATES = [
 
 // Color palette for charts
 const COLORS = {
-  emerald: '#10b981',
+  emerald: '#141A56',
   blue: '#3b82f6',
   purple: '#8b5cf6',
   amber: '#f59e0b',
@@ -78,7 +78,7 @@ const SEVERITY_COLORS = {
 };
 
 const STATUS_PIE_COLORS = [
-  '#10b981', // Open & Accrediting
+  '#141A56', // Open & Accrediting
   '#3b82f6', // Voting In Progress
   '#8b5cf6', // Counting & Collation
   '#f59e0b', // Delayed / Materials Pending
@@ -261,7 +261,7 @@ export default function NationalOverview() {
     const disruptedIncident = Math.max(28, incidentCount * 3 + 12);
 
     return [
-      { name: 'Open & Accrediting', value: openAccrediting, color: '#10b981' },
+      { name: 'Open & Accrediting', value: openAccrediting, color: '#141A56' },
       { name: 'Voting In Progress', value: votingInProgress, color: '#3b82f6' },
       { name: 'Counting & Collation', value: countingCollation, color: '#8b5cf6' },
       { name: 'Delayed / Materials Pending', value: delayedMaterials, color: '#f59e0b' },
@@ -630,7 +630,7 @@ export default function NationalOverview() {
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Bar dataKey="Accreditation" fill="#10b981" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="Accreditation" fill="#141A56" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="Incidents" fill="#ef4444" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="Results" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
               </BarChart>
@@ -677,7 +677,7 @@ export default function NationalOverview() {
                   }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Bar yAxisId="left" dataKey="Resolved" fill="#10b981" stackId="a" radius={[0, 0, 0, 0]} />
+                <Bar yAxisId="left" dataKey="Resolved" fill="#141A56" stackId="a" radius={[0, 0, 0, 0]} />
                 <Bar yAxisId="left" dataKey="Investigating" fill="#f59e0b" stackId="a" radius={[0, 0, 0, 0]} />
                 <Bar yAxisId="left" dataKey="Pending" fill="#ef4444" stackId="a" radius={[6, 6, 0, 0]} />
                 <Line yAxisId="right" type="monotone" dataKey="ResolutionRate" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6' }} name="Resolution %" />

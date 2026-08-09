@@ -1,6 +1,6 @@
 {
-  "name": "ElectionMonitor",
+  "name": "iVote",
   "description": "A lightweight, robust election monitoring platform for real-time observation, reporting, and data visualization.",
   "requestFramePermissions": ["camera", "geolocation"],
-  "majorCapabilities": ["Real-time data synchronization", "Observer incident reporting", "Geospatial visualization"]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

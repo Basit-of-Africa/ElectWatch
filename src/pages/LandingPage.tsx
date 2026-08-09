@@ -313,7 +313,7 @@ export default function LandingPage() {
 
   // Chart Data: Category Donut
   const categoryData = [
-    { name: 'Normal', value: normalCount || 1, color: '#10B981' },
+    { name: 'Normal', value: normalCount || 1, color: '#141A56' },
     { name: 'Incident', value: incidentCount || 1, color: '#EF4444' },
     { name: 'Warning', value: warningCount || 1, color: '#F59E0B' },
     { name: 'Information', value: infoCount || 1, color: '#3B82F6' },
@@ -327,7 +327,7 @@ export default function LandingPage() {
   }, {} as Record<string, number>);
 
   const securityChartData = [
-    { name: 'Peaceful', count: securityCounts['Peaceful'] || 14, fill: '#10B981' },
+    { name: 'Peaceful', count: securityCounts['Peaceful'] || 14, fill: '#141A56' },
     { name: 'Tense', count: securityCounts['Tense'] || 3, fill: '#F59E0B' },
     { name: 'Violent', count: securityCounts['Violent'] || 1, fill: '#EF4444' },
   ];
@@ -352,23 +352,23 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#F7F5F0] text-gray-900 font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
       {/* 1. TOP OFFICIAL HEADER BAR */}
-      <header className="bg-[#0a2f1d] text-white border-b border-emerald-800/80 sticky top-0 z-50 shadow-md">
+      <header className="bg-[#141A56] text-white border-b border-indigo-900/80 sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand & Crest */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-xl shadow-md border border-emerald-500">
+            <div className="w-10 h-10 rounded-full bg-indigo-800 text-white font-black flex items-center justify-center text-xl shadow-md border border-indigo-600">
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-base sm:text-lg tracking-tight font-serif text-white leading-tight">
-                  CivicWatch Nigeria
+                  iVote
                 </h1>
-                <span className="hidden sm:inline-block px-2 py-0.5 bg-emerald-900/80 text-emerald-300 text-[10px] font-mono font-bold uppercase rounded-md border border-emerald-700/60">
+                <span className="hidden sm:inline-block px-2 py-0.5 bg-indigo-950/80 text-indigo-200 text-[10px] font-mono font-bold uppercase rounded-md border border-indigo-800/60">
                   PUBLIC STREAM
                 </span>
               </div>
-              <p className="text-[11px] text-emerald-200/80 font-medium">
+              <p className="text-[11px] text-indigo-200/80 font-medium">
                 Civilian Watch & Real-Time Electoral Transmission Hub
               </p>
             </div>
@@ -427,8 +427,8 @@ export default function LandingPage() {
       </header>
 
       {/* 2. HERO SECTION */}
-      <section className="bg-gradient-to-b from-[#0a2f1d] via-[#0e4227] to-[#082618] text-white py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px]" />
+      <section className="bg-gradient-to-b from-[#141A56] via-[#101548] to-[#0a0c2e] text-white py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#6272c0_1px,transparent_1px)] [background-size:16px_16px]" />
 
         <div className="max-w-7xl mx-auto relative z-10 space-y-6">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -872,15 +872,15 @@ export default function LandingPage() {
       </main>
 
       {/* 5. FOOTER */}
-      <footer className="bg-[#0a2f1d] text-white border-t border-emerald-800/80 py-8 px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left text-xs text-emerald-200/80 font-medium">
+      <footer className="bg-[#141A56] text-white border-t border-indigo-900/80 py-8 px-4 sm:px-6 lg:px-8 mt-12">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left text-xs text-indigo-200/80 font-medium">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-base border border-emerald-500">
+            <div className="w-8 h-8 rounded-full bg-indigo-800 text-white font-bold flex items-center justify-center text-base border border-indigo-600">
               <ShieldCheck className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="font-bold text-white text-sm font-serif">CivicWatch Nigeria</p>
-              <p className="text-[11px] text-emerald-300/70 mt-0.5">Civilian Watch Network & Independent Electoral Transmission</p>
+              <p className="font-bold text-white text-sm font-serif">iVote</p>
+              <p className="text-[11px] text-indigo-300/70 mt-0.5">Civilian Watch Network & Independent Electoral Transmission</p>
             </div>
           </div>
 
@@ -889,11 +889,11 @@ export default function LandingPage() {
             <span>•</span>
             <Link to="/login" className="hover:text-white transition-colors">Administrator Portal</Link>
             <span>•</span>
-            <span className="text-emerald-300">CivicWatch 2026 Edition</span>
+            <span className="text-indigo-300">iVote 2026 Edition</span>
           </div>
 
           <div className="text-[11px]">
-            © 2026 CivicWatch Nigeria. All rights reserved.
+            © 2026 iVote. All rights reserved.
           </div>
         </div>
       </footer>

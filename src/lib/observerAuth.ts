@@ -7,7 +7,7 @@ import { User } from '../types';
 export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   {
     displayName: 'Amina Bello',
-    email: 'amina.bello@civicwatch.org',
+    email: 'amina.bello@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-LAG-014',
     assignedPollingUnitName: 'Ikeja Primary School, Ward 02',
@@ -18,7 +18,7 @@ export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   },
   {
     displayName: 'Chidi Okonkwo',
-    email: 'chidi.okonkwo@civicwatch.org',
+    email: 'chidi.okonkwo@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-FCT-042',
     assignedPollingUnitName: 'Garki Model Secondary, Area 11',
@@ -29,7 +29,7 @@ export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   },
   {
     displayName: 'Blessing Nwosu',
-    email: 'blessing.nwosu@civicwatch.org',
+    email: 'blessing.nwosu@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-RV-089',
     assignedPollingUnitName: 'Port Harcourt Township Hall',
@@ -40,7 +40,7 @@ export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   },
   {
     displayName: 'Ibrahim Danlami',
-    email: 'ibrahim.danlami@civicwatch.org',
+    email: 'ibrahim.danlami@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-KN-102',
     assignedPollingUnitName: 'Kano Central Library, Ward 05',
@@ -51,7 +51,7 @@ export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   },
   {
     displayName: 'Folake Adeleke',
-    email: 'folake.adeleke@civicwatch.org',
+    email: 'folake.adeleke@ivote.org',
     role: 'supervisor',
     assignedPollingUnitId: 'SUP-OYO-01',
     assignedPollingUnitName: 'Ibadan North Zonal Operations',
@@ -62,7 +62,7 @@ export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   },
   {
     displayName: 'Kemi Adebayo',
-    email: 'kemi.adebayo@civicwatch.org',
+    email: 'kemi.adebayo@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-LAG-016',
     assignedPollingUnitName: 'Gbagada Comprehensive High School',
@@ -73,7 +73,7 @@ export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   },
   {
     displayName: 'Farouk Usman',
-    email: 'farouk.usman@civicwatch.org',
+    email: 'farouk.usman@ivote.org',
     role: 'supervisor',
     assignedPollingUnitId: 'SUP-KN-02',
     assignedPollingUnitName: 'Kano Central Zonal Hub',
@@ -84,7 +84,7 @@ export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
   },
   {
     displayName: 'David Okoh',
-    email: 'david.okoh@civicwatch.org',
+    email: 'david.okoh@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-RV-104',
     assignedPollingUnitName: 'Rumuokwuta Girls Secondary',

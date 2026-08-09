@@ -222,7 +222,7 @@ export default function Dashboard() {
   }, {} as Record<string, number>);
 
   const pieChartData = [
-    { name: 'Low', value: severityData.low || 0, color: '#10b981' },
+    { name: 'Low', value: severityData.low || 0, color: '#141A56' },
     { name: 'Medium', value: severityData.medium || 0, color: '#f59e0b' },
     { name: 'High', value: severityData.high || 0, color: '#f97316' },
     { name: 'Critical', value: severityData.critical || 0, color: '#ef4444' },
@@ -260,7 +260,7 @@ export default function Dashboard() {
   const chartData = [
     { name: 'Incidents', value: stats.incidents, color: '#ef4444' },
     { name: 'Accreditation', value: stats.accreditation, color: '#f59e0b' },
-    { name: 'Results', value: stats.results, color: '#10b981' },
+    { name: 'Results', value: stats.results, color: '#141A56' },
   ];
 
   const StatCard = ({ title, value, icon: Icon, color }: any) => (
@@ -485,7 +485,7 @@ export default function Dashboard() {
                 itemStyle={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}
                 labelStyle={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', color: '#1e293b' }}
               />
-              <Line type="monotone" dataKey="low" stroke="#10b981" strokeWidth={4} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="low" stroke="#141A56" strokeWidth={4} dot={{ r: 4, fill: '#141A56', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
               <Line type="monotone" dataKey="medium" stroke="#f59e0b" strokeWidth={4} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
               <Line type="monotone" dataKey="high" stroke="#f97316" strokeWidth={4} dot={{ r: 4, fill: '#f97316', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
               <Line type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={4} dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />

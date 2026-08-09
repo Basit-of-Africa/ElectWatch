@@ -66,7 +66,7 @@ export default function Layout() {
 
   const handleSignOut = () => {
     try {
-      localStorage.removeItem('civicwatch_authorized_user_session');
+      localStorage.removeItem('ivote_authorized_user_session');
     } catch (e) {
       // ignore
     }
@@ -88,7 +88,7 @@ export default function Layout() {
             <Vote className="text-white w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-bold text-gray-900 leading-none">CivicWatch</h1>
+            <h1 className="font-bold text-gray-900 leading-none">iVote</h1>
             <p className="text-xs text-gray-500 mt-1">Election Monitor</p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function Layout() {
       <div className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <Vote className="text-emerald-600 w-6 h-6" />
-          <span className="font-bold text-gray-900 tracking-tight">CivicWatch</span>
+          <span className="font-bold text-gray-900 tracking-tight">iVote</span>
         </div>
         <div className="flex items-center gap-2">
           <NotificationCenter />

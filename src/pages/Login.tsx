@@ -55,7 +55,7 @@ export default function Login() {
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Vote className="w-8 h-8 text-emerald-400" />
-            <span className="text-2xl font-bold tracking-tight">CivicWatch.</span>
+            <span className="text-2xl font-bold tracking-tight">iVote.</span>
           </div>
           <Link
             to="/"
@@ -156,7 +156,7 @@ export default function Login() {
         </motion.div>
         
         <div className="mt-8 text-center md:hidden flex items-center gap-2 text-emerald-700 font-bold">
-           <Vote className="w-5 h-5" /> CivicWatch
+           <Vote className="w-5 h-5" /> iVote
         </div>
       </div>
     </div>

@@ -67,7 +67,7 @@ export const CATEGORIES: Record<string, CategoryConfig> = {
   accreditation: {
     id: 'accreditation',
     label: 'Accreditation Logs',
-    color: '#059669',
+    color: '#141A56',
     bgColor: 'bg-emerald-100',
     textColor: 'text-emerald-700',
     borderColor: 'border-emerald-300',

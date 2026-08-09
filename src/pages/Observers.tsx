@@ -62,7 +62,7 @@ const DEFAULT_OBSERVERS: User[] = [
   {
     uid: 'obs-lagos-01',
     displayName: 'Amina Bello',
-    email: 'amina.bello@civicwatch.org',
+    email: 'amina.bello@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-LAG-014',
     assignedPollingUnitName: 'Ikeja Primary School, Ward 02',
@@ -77,7 +77,7 @@ const DEFAULT_OBSERVERS: User[] = [
   {
     uid: 'obs-abuja-02',
     displayName: 'Chidi Okonkwo',
-    email: 'chidi.okonkwo@civicwatch.org',
+    email: 'chidi.okonkwo@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-FCT-042',
     assignedPollingUnitName: 'Garki Model Secondary, Area 11',
@@ -92,7 +92,7 @@ const DEFAULT_OBSERVERS: User[] = [
   {
     uid: 'obs-rivers-03',
     displayName: 'Blessing Nwosu',
-    email: 'blessing.nwosu@civicwatch.org',
+    email: 'blessing.nwosu@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-RV-089',
     assignedPollingUnitName: 'Port Harcourt Township Hall',
@@ -107,7 +107,7 @@ const DEFAULT_OBSERVERS: User[] = [
   {
     uid: 'obs-kano-04',
     displayName: 'Ibrahim Danlami',
-    email: 'ibrahim.danlami@civicwatch.org',
+    email: 'ibrahim.danlami@ivote.org',
     role: 'observer',
     assignedPollingUnitId: 'PU-KN-102',
     assignedPollingUnitName: 'Kano Central Library, Ward 05',
@@ -122,7 +122,7 @@ const DEFAULT_OBSERVERS: User[] = [
   {
     uid: 'obs-oyO-05',
     displayName: 'Folake Adeleke',
-    email: 'folake.adeleke@civicwatch.org',
+    email: 'folake.adeleke@ivote.org',
     role: 'supervisor',
     assignedPollingUnitId: 'SUP-OYO-01',
     assignedPollingUnitName: 'Ibadan North Zonal Operations',
@@ -181,16 +181,16 @@ export default function Observers() {
   const handleDownloadTemplate = () => {
     const templateContent = [
       'Name,Email,Phone,Role,Polling Unit ID,Polling Unit Name,State,LGA',
-      'Kemi Adebayo,kemi.adebayo@civicwatch.org,+234 803 111 2233,observer,PU-LAG-016,Gbagada Comprehensive High School,Lagos,Kosofe',
-      'Farouk Usman,farouk.usman@civicwatch.org,+234 802 999 8877,supervisor,SUP-KN-02,Kano Central Zonal Hub,Kano,Kano Municipal',
-      'David Okoh,david.okoh@civicwatch.org,+234 814 555 4433,observer,PU-RV-104,Rumuokwuta Girls Secondary,Rivers,Port Harcourt'
+      'Kemi Adebayo,kemi.adebayo@ivote.org,+234 803 111 2233,observer,PU-LAG-016,Gbagada Comprehensive High School,Lagos,Kosofe',
+      'Farouk Usman,farouk.usman@ivote.org,+234 802 999 8877,supervisor,SUP-KN-02,Kano Central Zonal Hub,Kano,Kano Municipal',
+      'David Okoh,david.okoh@ivote.org,+234 814 555 4433,observer,PU-RV-104,Rumuokwuta Girls Secondary,Rivers,Port Harcourt'
     ].join('\n');
 
     const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'civicwatch_observer_import_template.csv');
+    link.setAttribute('download', 'ivote_observer_import_template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -561,7 +561,7 @@ export default function Observers() {
   // Export to PDF
   const exportToPDF = () => {
     const docPDF = new jsPDF();
-    docPDF.text('CivicWatch - Observer Operations Directory', 14, 15);
+    docPDF.text('iVote - Observer Operations Directory', 14, 15);
     docPDF.setFontSize(10);
     docPDF.text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`, 14, 22);
 
@@ -1099,7 +1099,7 @@ export default function Observers() {
                     <input
                       type="email"
                       required
-                      placeholder="observer@civicwatch.org"
+                      placeholder="observer@ivote.org"
                       value={newObserver.email}
                       onChange={(e) => setNewObserver({ ...newObserver, email: e.target.value })}
                       className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium"

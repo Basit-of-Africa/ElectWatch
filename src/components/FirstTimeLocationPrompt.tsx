@@ -19,7 +19,7 @@ export default function FirstTimeLocationPrompt() {
     }
 
     // Check if user has already responded to location access prompt
-    const storageKey = `civicwatch_loc_prompted_${user.uid}`;
+    const storageKey = `ivote_loc_prompted_${user.uid}`;
     const alreadyPrompted = localStorage.getItem(storageKey);
 
     // Prompt if user is observer/supervisor and hasn't granted/declined or hasn't recorded location yet
@@ -64,7 +64,7 @@ export default function FirstTimeLocationPrompt() {
         }
 
         // Mark prompted in localStorage
-        localStorage.setItem(`civicwatch_loc_prompted_${user.uid}`, 'true');
+        localStorage.setItem(`ivote_loc_prompted_${user.uid}`, 'true');
 
         setTimeout(() => {
           setIsOpen(false);
@@ -97,7 +97,7 @@ export default function FirstTimeLocationPrompt() {
       console.warn('Could not save fallback location to Firestore:', e);
     }
 
-    localStorage.setItem(`civicwatch_loc_prompted_${user.uid}`, 'true');
+    localStorage.setItem(`ivote_loc_prompted_${user.uid}`, 'true');
 
     setTimeout(() => {
       setIsOpen(false);
@@ -174,7 +174,7 @@ export default function FirstTimeLocationPrompt() {
 
             <div className="flex items-center justify-center gap-2 text-[10px] text-gray-400 font-medium pt-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>CivicWatch Official Audit Trail Standard</span>
+              <span>iVote Official Audit Trail Standard</span>
             </div>
           </motion.div>
         </div>

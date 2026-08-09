@@ -9,6 +9,20 @@
   --radius-2xl: 1.5rem;
   --radius-3xl: 2rem;
   --radius-4xl: 3rem;
+
+  --color-primary: #141A56;
+
+  --color-emerald-50: #f0f2fa;
+  --color-emerald-100: #d4d9f3;
+  --color-emerald-200: #a3adde;
+  --color-emerald-300: #6b78c4;
+  --color-emerald-400: #3f4b9e;
+  --color-emerald-500: #222a78;
+  --color-emerald-600: #141A56;
+  --color-emerald-700: #101548;
+  --color-emerald-800: #0d103b;
+  --color-emerald-900: #0a0c2e;
+  --color-emerald-950: #05061a;
 }
 
 @layer base {
