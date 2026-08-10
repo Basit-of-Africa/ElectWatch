@@ -40,13 +40,15 @@ import {
   Activity,
   Zap,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Siren
 } from 'lucide-react';
 import { formatDistanceToNow, subDays, startOfDay, isSameDay, format } from 'date-fns';
 import { motion } from 'motion/react';
 import CheckInCard from '../components/CheckInCard';
 import AttendanceDashboard from '../components/AttendanceDashboard';
 import NationalOverview from '../components/NationalOverview';
+import IncidentHistory from '../components/IncidentHistory';
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -303,6 +305,15 @@ export default function Dashboard() {
         </div>
         
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Quick Jump to Incident History */}
+          <a 
+            href="#incident-history" 
+            className="flex items-center gap-2 px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl shadow-xl shadow-red-600/20 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer"
+          >
+            <Siren className="w-4 h-4 animate-pulse text-red-100" />
+            <span>Incident History</span>
+          </a>
+
           {/* Quick Actions for Observer */}
           {!isAdmin && !isSupervisor && (
             <Link 
@@ -370,6 +381,15 @@ export default function Dashboard() {
         transition={{ delay: 0.1 }}
       >
         <NationalOverview />
+      </motion.div>
+
+      {/* Incident History View - Lists all past SOS alerts triggered by observers with timestamp, location, and reporting observer */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+      >
+        <IncidentHistory />
       </motion.div>
 
       {/* Observer Geolocation Check-in Widget (Visible for Field Observers) */}
