@@ -49,6 +49,7 @@ export const savePendingReport = (
   pendingList.unshift(newReport);
   try {
     localStorage.setItem(PENDING_REPORTS_KEY, JSON.stringify(pendingList));
+    window.dispatchEvent(new Event('ivote_pending_reports_updated'));
     // Trigger Service Worker Background Sync
     requestBackgroundReportSync();
   } catch (err) {
@@ -61,6 +62,7 @@ export const removePendingReport = (clientId: string) => {
   const pendingList = getPendingReports().filter(item => item.clientId !== clientId);
   try {
     localStorage.setItem(PENDING_REPORTS_KEY, JSON.stringify(pendingList));
+    window.dispatchEvent(new Event('ivote_pending_reports_updated'));
   } catch (err) {
     console.error('Failed to remove pending report from localStorage', err);
   }
@@ -79,6 +81,7 @@ export const updatePendingReportStatus = (
   });
   try {
     localStorage.setItem(PENDING_REPORTS_KEY, JSON.stringify(pendingList));
+    window.dispatchEvent(new Event('ivote_pending_reports_updated'));
   } catch (err) {
     console.error('Failed to update pending report status in localStorage', err);
   }

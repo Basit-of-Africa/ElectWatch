@@ -37,6 +37,11 @@ export default function OfflineSyncBanner() {
   useEffect(() => {
     refreshPendingList();
 
+    const currentPending = getPendingReports();
+    if (navigator.onLine && currentPending.length > 0) {
+      handleSync();
+    }
+
     const handleOnline = () => {
       setIsOnline(true);
       // Auto-trigger sync when network reconnects
@@ -47,8 +52,17 @@ export default function OfflineSyncBanner() {
       setIsOnline(false);
     };
 
+    const handlePendingUpdated = () => {
+      refreshPendingList();
+      if (navigator.onLine && getPendingReports().length > 0 && !isSyncing) {
+        handleSync();
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', handleOnline);
+    window.addEventListener('ivote_pending_reports_updated', handlePendingUpdated);
 
     // Poll pending list every 3s in case items are added
     const interval = setInterval(() => {
@@ -58,9 +72,11 @@ export default function OfflineSyncBanner() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', handleOnline);
+      window.removeEventListener('ivote_pending_reports_updated', handlePendingUpdated);
       clearInterval(interval);
     };
-  }, []);
+  }, [user]);
 
   const handleSync = async () => {
     if (isSyncing || pendingReports.length === 0) return;
