@@ -10,6 +10,7 @@ import {
   getCachedIncidents 
 } from '../lib/offlineStorage';
 import { Link } from 'react-router-dom';
+import DangerButton from '../components/DangerButton';
 import { 
   BarChart, 
   Bar, 
@@ -302,11 +303,14 @@ export default function Dashboard() {
         </div>
         
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Danger SOS Button */}
+          <DangerButton variant="compact" label="EMERGENCY DANGER SOS" />
+
           {/* Quick Actions for Observer */}
           {!isAdmin && !isSupervisor && (
             <Link 
               to="/report" 
-              className="flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0"
+              className="flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm"
             >
               <PlusCircle className="w-5 h-5" /> Submit New Report
             </Link>

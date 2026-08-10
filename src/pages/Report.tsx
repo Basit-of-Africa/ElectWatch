@@ -26,6 +26,7 @@ import {
   Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import DangerButton from '../components/DangerButton';
 
 const reportSchema = z.object({
   pollingUnitId: z.string().min(1, 'Polling Unit ID is required'),
@@ -328,10 +329,15 @@ export default function Report() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-10">
-      <div className="text-center md:text-left">
-        <h1 className="text-4xl font-bold text-gray-900 tracking-tight font-serif">Submit Field Report</h1>
-        <p className="text-gray-500 mt-2 text-lg">Use this form to document accreditation, incidents, or final results.</p>
+    <div className="max-w-3xl mx-auto space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
+        <div>
+          <h1 className="text-4xl font-bold text-gray-900 tracking-tight font-serif">Submit Field Report</h1>
+          <p className="text-gray-500 mt-2 text-base">Use this form to document accreditation, incidents, or final results.</p>
+        </div>
+        <div className="shrink-0">
+          <DangerButton variant="compact" label="SOS DANGER ALERT" />
+        </div>
       </div>
 
       <AnimatePresence>

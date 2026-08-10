@@ -4,6 +4,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
 import { User, CheckInStatus } from '../types';
 import { MapPin, CheckCircle2, Navigation, AlertTriangle, Clock, RefreshCw, Send, ShieldCheck, Compass } from 'lucide-react';
+import DangerButton from './DangerButton';
 import { format } from 'date-fns';
 
 interface CheckInCardProps {
@@ -293,6 +294,10 @@ export default function CheckInCard({ onCheckInSuccess }: CheckInCardProps) {
           </div>
         )}
       </form>
+
+      <div className="mt-6 pt-4 border-t border-gray-100">
+        <DangerButton variant="card" />
+      </div>
     </div>
   );
 }

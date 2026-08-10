@@ -5,6 +5,8 @@ import { signOut } from 'firebase/auth';
 import NotificationCenter from './NotificationCenter';
 import OfflineSyncBanner from './OfflineSyncBanner';
 import FirstTimeLocationPrompt from './FirstTimeLocationPrompt';
+import DangerButton from './DangerButton';
+import ActiveSOSBanner from './ActiveSOSBanner';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -138,6 +140,7 @@ export default function Layout() {
           <span className="font-bold text-gray-900 tracking-tight">iVote</span>
         </div>
         <div className="flex items-center gap-2">
+          <DangerButton variant="compact" />
           <NotificationCenter />
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -212,11 +215,13 @@ export default function Layout() {
              )}
           </div>
           <div className="flex items-center gap-4">
-             <div className="h-8 w-px bg-gray-100 mx-2" />
+             <DangerButton variant="header" />
+             <div className="h-8 w-px bg-gray-100 mx-1" />
              <NotificationCenter />
           </div>
         </header>
 
+        <ActiveSOSBanner />
         <OfflineSyncBanner />
         <FirstTimeLocationPrompt />
 

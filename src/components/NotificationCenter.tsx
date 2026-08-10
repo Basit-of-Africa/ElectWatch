@@ -112,6 +112,7 @@ export default function NotificationCenter() {
     const roles: string[] = [user.uid];
     if (isAdmin) roles.push('admin');
     if (isSupervisor) roles.push('supervisor');
+    roles.push('observer');
 
     const q = query(
       collection(db, 'notifications'), 
@@ -146,7 +147,7 @@ export default function NotificationCenter() {
               data.title?.toUpperCase().includes('CRITICAL') || 
               data.title?.toUpperCase().includes('HIGH');
 
-            if ((isAdmin || isSupervisor) && isHighOrCritical) {
+            if (isHighOrCritical) {
               triggerHighSeverityToast(data.title, data.message, undefined, data.link);
             } else {
               toast(data.title, {
@@ -169,7 +170,7 @@ export default function NotificationCenter() {
 
   // 2. Listen directly for new High / Critical Severity Incidents in real-time
   useEffect(() => {
-    if (!isAdmin && !isSupervisor) return;
+    if (!user) return;
 
     const incidentsQuery = query(
       collection(db, 'incidents'),
