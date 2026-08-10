@@ -249,7 +249,7 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="relative w-full max-w-xl bg-gradient-to-b from-gray-900 via-slate-950 to-black text-white rounded-3xl border-2 border-red-600/80 shadow-[0_0_50px_rgba(220,38,38,0.4)] overflow-hidden"
+          className="relative w-full max-w-xl my-auto bg-gradient-to-b from-gray-900 via-slate-950 to-black text-white rounded-3xl border-2 border-red-600/80 shadow-[0_0_50px_rgba(220,38,38,0.5)] overflow-hidden"
         >
           {/* Header Bar */}
           <div className="p-6 bg-gradient-to-r from-red-950 via-red-900 to-red-950 border-b border-red-800/50 flex items-center justify-between">

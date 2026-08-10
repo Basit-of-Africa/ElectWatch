@@ -294,10 +294,6 @@ export default function CheckInCard({ onCheckInSuccess }: CheckInCardProps) {
           </div>
         )}
       </form>
-
-      <div className="mt-6 pt-4 border-t border-gray-100">
-        <DangerButton variant="card" />
-      </div>
     </div>
   );
 }

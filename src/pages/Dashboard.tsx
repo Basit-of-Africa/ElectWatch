@@ -303,9 +303,6 @@ export default function Dashboard() {
         </div>
         
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Danger SOS Button */}
-          <DangerButton variant="compact" label="EMERGENCY DANGER SOS" />
-
           {/* Quick Actions for Observer */}
           {!isAdmin && !isSupervisor && (
             <Link 
