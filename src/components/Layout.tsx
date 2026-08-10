@@ -7,6 +7,7 @@ import OfflineSyncBanner from './OfflineSyncBanner';
 import FirstTimeLocationPrompt from './FirstTimeLocationPrompt';
 import DangerButton from './DangerButton';
 import ActiveSOSBanner from './ActiveSOSBanner';
+import InstallPWABanner, { InstallPWAButton } from './InstallPWA';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -116,12 +117,17 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-gray-100">
-          <div className="bg-gray-50 rounded-2xl p-4 mb-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Account</p>
-            <p className="text-sm font-medium text-gray-900 mt-1 truncate">{user?.displayName}</p>
-            <p className="text-xs text-emerald-600 font-medium bg-emerald-100/50 px-2 py-0.5 rounded-full inline-block mt-1 uppercase tracking-tighter">
-              {getRoleLabel()}
-            </p>
+          <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-2">
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Account</p>
+              <p className="text-sm font-medium text-gray-900 mt-1 truncate">{user?.displayName}</p>
+              <p className="text-xs text-emerald-600 font-medium bg-emerald-100/50 px-2 py-0.5 rounded-full inline-block mt-1 uppercase tracking-tighter">
+                {getRoleLabel()}
+              </p>
+            </div>
+            <div className="pt-2 border-t border-gray-200/60">
+              <InstallPWAButton className="w-full justify-center" />
+            </div>
           </div>
           <button
             onClick={handleSignOut}
@@ -160,6 +166,9 @@ export default function Layout() {
             className="md:hidden fixed inset-0 z-40 pt-20 bg-white"
           >
             <nav className="p-6 space-y-2">
+              <div className="pb-2">
+                <InstallPWAButton className="w-full justify-center py-3 text-sm" />
+              </div>
               {navigation.map((item) => (
                 <Link
                   key={item.name}
@@ -214,7 +223,8 @@ export default function Layout() {
                </motion.span>
              )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+             <InstallPWAButton />
              <DangerButton variant="header" />
              <div className="h-8 w-px bg-gray-100 mx-1" />
              <NotificationCenter />
@@ -224,6 +234,7 @@ export default function Layout() {
         <ActiveSOSBanner />
         <OfflineSyncBanner />
         <FirstTimeLocationPrompt />
+        <InstallPWABanner />
 
         <div className="p-6 md:p-10 lg:p-12 max-w-7xl mx-auto w-full">
           <Outlet />
