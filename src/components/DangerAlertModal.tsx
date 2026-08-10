@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -110,38 +111,50 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
   const [dispatchedIncidentId, setDispatchedIncidentId] = useState<string | null>(null);
 
   // Fetch location automatically when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setGettingLocation(true);
-      if (navigator.geolocation) {
+  const fetchLocation = (): Promise<{ lat: number; lng: number; accuracy: number }> => {
+    setGettingLocation(true);
+    return new Promise((resolve) => {
+      if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            setCoords({
+            const freshCoords = {
               lat: pos.coords.latitude,
               lng: pos.coords.longitude,
               accuracy: Math.round(pos.coords.accuracy)
-            });
+            };
+            setCoords(freshCoords);
             setGettingLocation(false);
+            resolve(freshCoords);
           },
           (err) => {
             console.warn('Geolocation fallback:', err.message);
-            setCoords({
+            const fallback = {
               lat: user?.checkInLat || 6.5244,
               lng: user?.checkInLng || 3.3792,
               accuracy: user?.checkInAccuracy || 20
-            });
+            };
+            setCoords(fallback);
             setGettingLocation(false);
+            resolve(fallback);
           },
-          { enableHighAccuracy: true, timeout: 8000 }
+          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
         );
       } else {
-        setCoords({
+        const fallback = {
           lat: user?.checkInLat || 6.5244,
           lng: user?.checkInLng || 3.3792,
           accuracy: 25
-        });
+        };
+        setCoords(fallback);
         setGettingLocation(false);
+        resolve(fallback);
       }
+    });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchLocation();
     } else {
       setSosDispatched(false);
       setSubmitting(false);
@@ -157,16 +170,24 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
     setSubmitting(true);
     playEmergencySiren();
 
+    // Capture latest fresh geolocation immediately on press
+    let currentCoords = coords;
+    if (!currentCoords || gettingLocation) {
+      currentCoords = await fetchLocation();
+    }
+
+    const lat = currentCoords?.lat || user?.checkInLat || 6.5244;
+    const lng = currentCoords?.lng || user?.checkInLng || 3.3792;
+    const accuracy = currentCoords?.accuracy || 20;
+    const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
     const puId = user.assignedPollingUnitId || 'PU-FIELD';
     const puName = user.assignedPollingUnitName || 'Field Location';
-    const lat = coords?.lat || user.checkInLat || 6.5244;
-    const lng = coords?.lng || user.checkInLng || 3.3792;
     const timestampISO = new Date().toISOString();
 
-    const fullDescription = `🚨 [EMERGENCY DANGER SOS] ${currentCategoryObj.label.toUpperCase()} at ${puName} (${puId}). Observer: ${user.displayName} (${user.phone || user.email}). ${notes ? 'Details: ' + notes : 'Immediate security response required!'}`;
+    const fullDescription = `🚨 [EMERGENCY DANGER SOS] ${currentCategoryObj.label.toUpperCase()} at ${puName} (${puId}). Observer: ${user.displayName} (${user.phone || user.email}). GPS: ${lat.toFixed(5)}°, ${lng.toFixed(5)}° (±${accuracy}m). Map: ${mapsUrl}. ${notes ? 'Details: ' + notes : 'Immediate security & emergency response required!'}`;
 
     try {
-      // 1. Save critical report
+      // 1. Save critical report with full geolocation
       const reportRef = await addDoc(collection(db, 'reports'), {
         pollingUnitId: puId,
         observerId: user.uid,
@@ -182,28 +203,33 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
           observerPhone: user.phone || 'N/A',
           state: user.state || 'Lagos',
           lga: user.lga || 'Ikeja',
-          notes: notes
+          notes: notes,
+          gpsLocation: { lat, lng, accuracy },
+          mapsUrl
         },
         location: { lat, lng }
       });
 
-      // 2. Save critical incident
+      // 2. Save critical incident with geolocation
       const incidentRef = await addDoc(collection(db, 'incidents'), {
         reportId: reportRef.id,
         pollingUnitId: puId,
         severity: 'critical',
         status: 'pending',
         description: fullDescription,
+        location: { lat, lng, accuracy },
+        mapsUrl,
         timestamp: serverTimestamp()
       });
 
-      // 3. Dispatch high-priority notifications to Admin, Supervisors, and Observers nearby
+      // 3. Dispatch high-priority notifications including GPS coordinates to Admin, Supervisors, and Observers
       const notifData = {
         title: `🚨 EMERGENCY SOS: ${currentCategoryObj.label}`,
-        message: `${user.displayName} reported ${currentCategoryObj.label} at ${puName} (${puId}). Immediate emergency dispatch required.`,
+        message: `${user.displayName} reported ${currentCategoryObj.label} at ${puName} (${puId}) [GPS: ${lat.toFixed(4)}°, ${lng.toFixed(4)}°]. Immediate response needed.`,
         type: 'error',
         read: false,
         link: `/incidents/${incidentRef.id}`,
+        mapsUrl,
         timestamp: serverTimestamp()
       };
 
@@ -221,7 +247,11 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
         puId,
         puName,
         timestamp: timestampISO,
-        notes
+        notes,
+        lat,
+        lng,
+        accuracy,
+        mapsUrl
       };
       localStorage.setItem(`ivote_active_sos_${user.uid}`, JSON.stringify(activeSosPayload));
       window.dispatchEvent(new Event('ivote_sos_updated'));
@@ -230,8 +260,8 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
       setSosDispatched(true);
       setSubmitting(false);
 
-      toast.error('🚨 EMERGENCY SOS BROADCASTED TO ADMIN & OBSERVERS!', {
-        description: 'Security & election control room alerted. Stay safe!',
+      toast.error('🚨 EMERGENCY SOS & GPS BROADCASTED TO CONTROL ROOM!', {
+        description: `Live coordinates (${lat.toFixed(4)}°, ${lng.toFixed(4)}°) attached to distress signal.`,
         duration: 10000,
       });
 
@@ -242,9 +272,9 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
         <motion.div
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -443,6 +473,7 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
           )}
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
