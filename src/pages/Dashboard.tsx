@@ -49,6 +49,7 @@ import CheckInCard from '../components/CheckInCard';
 import AttendanceDashboard from '../components/AttendanceDashboard';
 import NationalOverview from '../components/NationalOverview';
 import IncidentHistory from '../components/IncidentHistory';
+import OsunCountdown from '../components/OsunCountdown';
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -345,6 +346,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Osun State Gubernatorial Election Dynamic Countdown */}
+      <OsunCountdown />
 
       {/* Stats Grid - Tailored per role */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
