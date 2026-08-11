@@ -9,6 +9,7 @@ import DangerButton from './DangerButton';
 import ActiveSOSBanner from './ActiveSOSBanner';
 import InstallPWABanner, { InstallPWAButton } from './InstallPWA';
 import ElectionScopeSelector from './ElectionScopeSelector';
+import ObserverOnboarding from './ObserverOnboarding';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -22,7 +23,9 @@ import {
   Wifi,
   WifiOff,
   Users,
-  Globe
+  Globe,
+  BookOpen,
+  ShieldCheck
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -35,6 +38,7 @@ export default function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -182,6 +186,16 @@ export default function Layout() {
                 </Link>
               ))}
               <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setShowGuidelinesModal(true);
+                }}
+                className="flex items-center gap-4 p-4 text-lg font-medium text-emerald-800 hover:bg-emerald-50 rounded-2xl w-full text-left cursor-pointer"
+              >
+                <BookOpen className="w-6 h-6 text-emerald-600" />
+                Code of Conduct & Guidelines
+              </button>
+              <button
                 onClick={handleSignOut}
                 className="flex items-center gap-4 p-4 text-lg font-medium text-red-600 hover:bg-red-50 rounded-2xl w-full text-left"
               >
@@ -225,6 +239,13 @@ export default function Layout() {
              )}
           </div>
           <div className="flex items-center gap-3">
+             <button
+               onClick={() => setShowGuidelinesModal(true)}
+               className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200/80 transition-all cursor-pointer"
+             >
+               <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+               <span>Code of Conduct</span>
+             </button>
              <ElectionScopeSelector compact />
              <InstallPWAButton />
              <DangerButton variant="header" />
@@ -242,6 +263,25 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Modal Overlay for Observer Guidelines & Onboarding */}
+      <AnimatePresence>
+        {showGuidelinesModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-4xl"
+            >
+              <ObserverOnboarding 
+                onCancel={() => setShowGuidelinesModal(false)}
+                onComplete={() => setShowGuidelinesModal(false)}
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -60,7 +60,7 @@ const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
   {
     id: 'RPT-1001',
     observerId: 'obs-lagos-01',
-    observerName: 'Amina Bello',
+    observerName: 'Accredited Field Observer',
     type: 'normal',
     state: 'Lagos',
     lga: 'Ikeja',
@@ -77,7 +77,7 @@ const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
   {
     id: 'RPT-1002',
     observerId: 'obs-kano-04',
-    observerName: 'Ibrahim Danlami',
+    observerName: 'Accredited Field Observer',
     type: 'incident',
     state: 'Kano',
     lga: 'Kano Municipal',
@@ -95,7 +95,7 @@ const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
   {
     id: 'RPT-1003',
     observerId: 'obs-abuja-02',
-    observerName: 'Chidi Okonkwo',
+    observerName: 'Accredited Field Observer',
     type: 'normal',
     state: 'FCT',
     lga: 'Abuja Municipal',
@@ -112,7 +112,7 @@ const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
   {
     id: 'RPT-1004',
     observerId: 'obs-rivers-03',
-    observerName: 'Blessing Nwosu',
+    observerName: 'Accredited Field Observer',
     type: 'warning',
     state: 'Rivers',
     lga: 'Port Harcourt',
@@ -130,7 +130,7 @@ const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
   {
     id: 'RPT-1005',
     observerId: 'obs-oyo-05',
-    observerName: 'Folake Adeleke',
+    observerName: 'Accredited Field Observer',
     type: 'info',
     state: 'Oyo',
     lga: 'Ibadan North',
@@ -147,7 +147,7 @@ const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
   {
     id: 'RPT-1006',
     observerId: 'obs-kaduna-06',
-    observerName: 'Fatima Garba',
+    observerName: 'Accredited Field Observer',
     type: 'normal',
     state: 'Kaduna',
     lga: 'Kaduna North',
@@ -215,8 +215,8 @@ function parseFirestoreReport(doc: any): PublicDisplayReport {
     id: doc.id,
     pollingUnitId: doc.pollingUnitId || payload.pollingUnitId || 'PU-FIELD',
     pollingUnitName: payload.pollingUnitName || payload.pu || doc.pollingUnitId || 'Polling Unit',
-    observerId: doc.observerId || 'obs-anon',
-    observerName: payload.observerName || payload.observer || 'Accredited Observer',
+    observerId: doc.observerId ? `OBS-${doc.observerId.substring(0, 6).toUpperCase()}` : 'OBS-FIELD',
+    observerName: 'Accredited Field Observer',
     type: reportType,
     state: payload.state || 'National',
     lga: payload.lga || '',
@@ -414,14 +414,17 @@ export default function LandingPage() {
         <div className="bg-[#082316] px-4 py-1.5 text-xs font-medium text-emerald-200 border-t border-emerald-800/60 flex items-center justify-between">
           <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <Radio className="w-3.5 h-3.5 text-[#FC560C] animate-pulse" />
               <span className="font-bold text-white uppercase text-[10px] tracking-widest">
                 PUBLIC LIVE TRANSMISSION FEED — 2026 GENERAL ELECTIONS
               </span>
             </div>
-            <div className="hidden sm:flex items-center gap-4 text-[11px] text-emerald-300">
-              <span>Verified Observer Telemetry</span>
-              <span>•</span>
+            <div className="hidden sm:flex items-center gap-4 text-[11px] text-[#FC560C] font-semibold">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#FC560C] animate-ping" />
+                Verified Observer Telemetry
+              </span>
+              <span className="text-white/30">•</span>
               <span>36 States + FCT Coverage</span>
             </div>
           </div>
@@ -500,11 +503,12 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-200">State Coverage</span>
+            <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-[#FC560C]/40 relative overflow-hidden group shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-[#FC560C]/15 rounded-full blur-xl pointer-events-none" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#FC560C]">State Coverage</span>
               <div className="text-3xl font-extrabold font-serif text-white mt-1">{statesReportingCount}</div>
-              <p className="text-[11px] text-emerald-300/80 mt-1 flex items-center gap-1">
-                <Globe className="w-3 h-3 text-emerald-400" /> Active Regional Hubs
+              <p className="text-[11px] text-[#FC560C] font-bold mt-1 flex items-center gap-1">
+                <Globe className="w-3.5 h-3.5 text-[#FC560C]" /> Active Regional Hubs
               </p>
             </div>
           </div>
@@ -718,8 +722,10 @@ export default function LandingPage() {
                           )}
                         </div>
 
-                        <div className="text-gray-400 text-[11px] font-medium">
-                          Observer: <span className="font-bold text-gray-700">{rpt.observerName || 'Accredited Observer'}</span>
+                        <div className="text-gray-500 text-[11px] font-medium flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 px-2.5 py-1 rounded-full">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="font-semibold text-slate-700">Accredited Field Observer</span>
+                          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">(Identity Protected)</span>
                         </div>
                       </div>
                     </motion.div>

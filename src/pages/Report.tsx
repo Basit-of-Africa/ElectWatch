@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DangerButton from '../components/DangerButton';
+import ObserverOnboarding from '../components/ObserverOnboarding';
 
 const reportSchema = z.object({
   pollingUnitId: z.string().min(1, 'Polling Unit ID is required'),
@@ -50,6 +51,13 @@ type ReportForm = z.infer<typeof reportSchema>;
 
 export default function Report() {
   const { user, isSupervisor } = useAuth();
+  const [hasAcknowledged, setHasAcknowledged] = useState<boolean>(() => {
+    if (!user) return true;
+    if (user.hasAcknowledgedGuidelines) return true;
+    const localAck = localStorage.getItem(`observer_guidelines_ack_${user.uid}`);
+    return localAck === 'true';
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -346,6 +354,24 @@ export default function Report() {
       setIsSubmitting(false);
     }
   };
+
+  if (!hasAcknowledged) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 flex items-center gap-3 text-amber-900 text-xs">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+          <p className="leading-relaxed">
+            <strong>Observer Onboarding Required:</strong> To maintain election integrity and non-partisan reporting standards, all accredited field observers must review and accept the official Election Day Code of Conduct before gaining access to reporting tools.
+          </p>
+        </div>
+
+        <ObserverOnboarding 
+          isMandatory={true}
+          onComplete={() => setHasAcknowledged(true)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">

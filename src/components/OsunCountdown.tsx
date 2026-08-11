@@ -93,19 +93,19 @@ export default function OsunCountdown() {
         {/* Live Countdown Timer Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {[
-            { label: 'Days', value: timeLeft.days, color: 'from-emerald-500/20 to-emerald-900/40' },
-            { label: 'Hours', value: timeLeft.hours, color: 'from-slate-800/90 to-slate-900/90' },
-            { label: 'Minutes', value: timeLeft.minutes, color: 'from-slate-800/90 to-slate-900/90' },
-            { label: 'Seconds', value: timeLeft.seconds, color: 'from-amber-500/20 to-amber-900/40' },
+            { label: 'Days', value: timeLeft.days, color: 'from-emerald-500/20 to-emerald-900/40', border: 'border-emerald-500/20' },
+            { label: 'Hours', value: timeLeft.hours, color: 'from-slate-800/90 to-slate-900/90', border: 'border-emerald-500/20' },
+            { label: 'Minutes', value: timeLeft.minutes, color: 'from-slate-800/90 to-slate-900/90', border: 'border-emerald-500/20' },
+            { label: 'Seconds', value: timeLeft.seconds, color: 'from-[#FC560C]/25 to-[#FC560C]/10', border: 'border-[#FC560C]/50 shadow-[#FC560C]/10' },
           ].map((item, idx) => (
             <div 
               key={idx}
-              className={`bg-gradient-to-b ${item.color} backdrop-blur-md border border-emerald-500/20 rounded-2xl p-4 text-center shadow-lg hover:border-emerald-400/40 transition-all`}
+              className={`bg-gradient-to-b ${item.color} backdrop-blur-md border ${item.border} rounded-2xl p-4 text-center shadow-lg hover:border-[#FC560C]/60 transition-all`}
             >
               <div className="text-3xl sm:text-4xl md:text-5xl font-black font-mono tracking-tight text-white">
                 {String(item.value).padStart(2, '0')}
               </div>
-              <div className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-emerald-400/90 mt-1">
+              <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest ${idx === 3 ? 'text-[#FC560C]' : 'text-emerald-400/90'} mt-1`}>
                 {item.label}
               </div>
             </div>
