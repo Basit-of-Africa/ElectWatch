@@ -411,7 +411,7 @@ export default function LandingPage() {
         </div>
 
         {/* Sub-bar: Public Status Banner */}
-        <div className="bg-[#082316] px-4 py-1.5 text-xs font-medium text-emerald-200 border-t border-emerald-800/60 flex items-center justify-between">
+        <div className="bg-[#10108c] px-4 py-1.5 text-xs font-medium text-blue-100 border-t border-indigo-900/80 flex items-center justify-between">
           <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Radio className="w-3.5 h-3.5 text-[#FC560C] animate-pulse" />
