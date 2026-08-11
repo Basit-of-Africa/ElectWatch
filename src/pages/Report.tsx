@@ -30,9 +30,15 @@ import DangerButton from '../components/DangerButton';
 
 const reportSchema = z.object({
   pollingUnitId: z.string().min(1, 'Polling Unit ID is required'),
+  electionLevel: z.enum(['governorship', 'presidential', 'senatorial', 'house_of_reps']),
   type: z.enum(['accreditation', 'incident', 'result']),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   voterCount: z.number().optional(),
+  apcVotes: z.number().optional(),
+  pdpVotes: z.number().optional(),
+  lpVotes: z.number().optional(),
+  nnppVotes: z.number().optional(),
+  otherVotes: z.number().optional(),
   severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   location: z.object({
     lat: z.number(),
@@ -128,6 +134,7 @@ export default function Report() {
   const { register, handleSubmit, formState: { errors }, watch, reset, setValue } = useForm<ReportForm>({
     resolver: zodResolver(reportSchema),
     defaultValues: {
+      electionLevel: 'governorship',
       type: 'accreditation',
       pollingUnitId: user?.assignedPollingUnitId || '',
     }
@@ -235,9 +242,15 @@ export default function Report() {
         location: taggedLocation,
         media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash })),
         payload: {
+          electionLevel: data.electionLevel,
           description: data.description,
           voterCount: data.voterCount,
           severity: data.severity,
+          apcVotes: data.apcVotes,
+          pdpVotes: data.pdpVotes,
+          lpVotes: data.lpVotes,
+          nnppVotes: data.nnppVotes,
+          otherVotes: data.otherVotes,
         },
       });
 
@@ -258,9 +271,15 @@ export default function Report() {
         location: taggedLocation,
         media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash })),
         payload: {
+          electionLevel: data.electionLevel,
           description: data.description,
           voterCount: data.voterCount,
           severity: data.severity,
+          apcVotes: data.apcVotes,
+          pdpVotes: data.pdpVotes,
+          lpVotes: data.lpVotes,
+          nnppVotes: data.nnppVotes,
+          otherVotes: data.otherVotes,
         },
       };
 
@@ -376,50 +395,86 @@ export default function Report() {
           </div>
         )}
 
-        {/* Polling Unit Section */}
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
-              <MapPin className="w-4 h-4" /> Polling Location
+        {/* Election Level & Polling Unit Section */}
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-widest px-1">
+              Election Level / Category
             </label>
-            <div className="relative group">
-              <input
-                {...register('pollingUnitId')}
-                placeholder="e.g. PU-LAG-102"
-                className={`w-full bg-gray-50 border-2 ${errors.pollingUnitId ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-2xl py-4 px-6 text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5`}
-              />
-              {errors.pollingUnitId && <p className="text-red-500 text-xs font-semibold mt-2 ml-4">{errors.pollingUnitId.message}</p>}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { id: 'governorship', name: 'Gubernatorial', sub: 'Osun Off-Cycle / State', badge: 'Active Default' },
+                { id: 'presidential', name: 'Presidential', sub: '2027 General Election', badge: 'National' },
+                { id: 'senatorial', name: 'Senatorial', sub: 'Senate Constituency', badge: 'National' },
+                { id: 'house_of_reps', name: 'House of Reps', sub: 'Federal Constituency', badge: 'National' },
+              ].map((lvl) => {
+                const isSel = watch('electionLevel') === lvl.id;
+                return (
+                  <button
+                    key={lvl.id}
+                    type="button"
+                    onClick={() => setValue('electionLevel', lvl.id as any)}
+                    className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
+                      isSel 
+                        ? 'border-emerald-600 bg-emerald-50/60 shadow-md ring-2 ring-emerald-500/20' 
+                        : 'border-gray-100 bg-gray-50/50 hover:bg-gray-100/80 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className={`text-xs font-black uppercase tracking-wider ${isSel ? 'text-emerald-900' : 'text-gray-800'}`}>{lvl.name}</span>
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${isSel ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600'}`}>{lvl.badge}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 font-medium truncate">{lvl.sub}</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="space-y-4">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
-              <Globe className="w-4 h-4" /> Geolocation
-            </label>
-            <button 
-              type="button"
-              onClick={handleAcquireLocation}
-              disabled={isGettingLocation}
-              className={`w-full h-[64px] rounded-2xl border-2 flex items-center justify-center gap-3 transition-all ${
-                location 
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700' 
-                  : 'border-dashed border-gray-200 bg-gray-50 text-gray-500 hover:border-emerald-300 hover:bg-emerald-50/10'
-              }`}
-            >
-              {isGettingLocation ? (
-                <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              ) : location ? (
-                <>
-                  <Navigation className="w-4 h-4" />
-                  GPS Attached ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})
-                </>
-              ) : (
-                <>
-                  <MapPin className="w-4 h-4" />
-                  Attach Safe Location
-                </>
-              )}
-            </button>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
+                <MapPin className="w-4 h-4" /> Polling Location
+              </label>
+              <div className="relative group">
+                <input
+                  {...register('pollingUnitId')}
+                  placeholder="e.g. PU-OSUN-102 (Osogbo)"
+                  className={`w-full bg-gray-50 border-2 ${errors.pollingUnitId ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-2xl py-4 px-6 text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5`}
+                />
+                {errors.pollingUnitId && <p className="text-red-500 text-xs font-semibold mt-2 ml-4">{errors.pollingUnitId.message}</p>}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
+                <Globe className="w-4 h-4" /> Geolocation
+              </label>
+              <button 
+                type="button"
+                onClick={handleAcquireLocation}
+                disabled={isGettingLocation}
+                className={`w-full h-[64px] rounded-2xl border-2 flex items-center justify-center gap-3 transition-all ${
+                  location 
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700' 
+                    : 'border-dashed border-gray-200 bg-gray-50 text-gray-500 hover:border-emerald-300 hover:bg-emerald-50/10'
+                }`}
+              >
+                {isGettingLocation ? (
+                  <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                ) : location ? (
+                  <>
+                    <Navigation className="w-4 h-4" />
+                    GPS Attached ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-4 h-4" />
+                    Attach Safe Location
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -690,6 +745,68 @@ export default function Report() {
                   {...register('voterCount', { valueAsNumber: true })}
                   className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-6 outline-none focus:border-emerald-500 transition-colors"
                 />
+              </motion.div>
+            )}
+
+            {reportType === 'result' && (
+              <motion.div 
+                key="result-fields"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4 p-6 bg-blue-50/50 rounded-3xl border border-blue-100"
+              >
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-blue-950 block">Official Party Vote Tally ({watch('electionLevel')?.toUpperCase() || 'ELECTION'})</label>
+                  <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider bg-blue-100 px-2 py-0.5 rounded-full">Form EC8A Copy</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">APC Votes</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      {...register('apcVotes', { valueAsNumber: true })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">PDP Votes</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      {...register('pdpVotes', { valueAsNumber: true })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Labour Party (LP)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      {...register('lpVotes', { valueAsNumber: true })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">NNPP Votes</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      {...register('nnppVotes', { valueAsNumber: true })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">Others (SDP, APGA...)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      {...register('otherVotes', { valueAsNumber: true })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                    />
+                  </div>
+                </div>
               </motion.div>
             )}
 

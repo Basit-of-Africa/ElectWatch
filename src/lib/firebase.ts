@@ -17,7 +17,7 @@ const firebaseConfig = {
   firestoreDatabaseId: clean(env.VITE_FIREBASE_DATABASE_ID) || defaultConfig.firestoreDatabaseId,
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Explicitly configure browserLocalPersistence to preserve login state across page reloads & browser restarts

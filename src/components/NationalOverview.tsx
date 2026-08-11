@@ -38,6 +38,7 @@ import {
   Radio
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ElectionScopeSelector from './ElectionScopeSelector';
 import { format, subHours, isAfter, startOfHour } from 'date-fns';
 
 type TimeRange = '1h' | '6h' | '12h' | '24h' | 'all';
@@ -45,6 +46,7 @@ type ViewMode = 'all' | 'incidents' | 'stations';
 
 const NIGERIAN_STATES = [
   'All States (National)',
+  'Osun (Off-Cycle Guber)',
   'Lagos',
   'Kano',
   'Rivers',
@@ -324,6 +326,9 @@ export default function NationalOverview() {
 
   return (
     <div className="space-y-6">
+      {/* Active Election Scope Banner (Osun Off-Cycle & 2027 General Elections) */}
+      <ElectionScopeSelector />
+
       {/* Top Header & Filter Controls Bar */}
       <div className="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-100 pb-4">

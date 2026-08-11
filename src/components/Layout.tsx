@@ -8,6 +8,7 @@ import FirstTimeLocationPrompt from './FirstTimeLocationPrompt';
 import DangerButton from './DangerButton';
 import ActiveSOSBanner from './ActiveSOSBanner';
 import InstallPWABanner, { InstallPWAButton } from './InstallPWA';
+import ElectionScopeSelector from './ElectionScopeSelector';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -224,6 +225,7 @@ export default function Layout() {
              )}
           </div>
           <div className="flex items-center gap-3">
+             <ElectionScopeSelector compact />
              <InstallPWAButton />
              <DangerButton variant="header" />
              <div className="h-8 w-px bg-gray-100 mx-1" />

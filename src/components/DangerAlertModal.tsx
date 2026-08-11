@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { triggerSystemPushNotification } from '../lib/fcm';
 
 interface DangerAlertModalProps {
   isOpen: boolean;
@@ -239,6 +240,14 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
         addDoc(collection(db, 'notifications'), { ...notifData, userId: 'supervisor' }),
         addDoc(collection(db, 'notifications'), { ...notifData, userId: 'observer' }),
       ]);
+
+      // Trigger system level push notification (runs background OS notification if supported)
+      triggerSystemPushNotification({
+        title: `🚨 EMERGENCY SOS: ${currentCategoryObj.label}`,
+        body: `${user.displayName} at ${puName} (${puId}) [GPS: ${lat.toFixed(4)}°, ${lng.toFixed(4)}°]. Immediate response needed!`,
+        link: `/incidents/${incidentRef.id}`,
+        isSosAlert: true
+      });
 
       // 4. Save active SOS status in localStorage so app displays persistent emergency banner
       const activeSosPayload = {

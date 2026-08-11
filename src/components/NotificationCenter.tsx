@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../context/AuthContext';
-import { Notification, Incident } from '../types';
+import type { Notification as AppNotification, Incident } from '../types';
 import { toast } from 'sonner';
 import { 
   Bell, 
@@ -18,12 +18,58 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
+import { 
+  requestFcmNotificationPermission, 
+  triggerSystemPushNotification, 
+  registerFcmForegroundHandler 
+} from '../lib/fcm';
 
 export default function NotificationCenter() {
   const { user, isAdmin, isSupervisor } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pushEnabled, setPushEnabled] = useState<boolean>(() => {
+    return 'Notification' in window && Notification.permission === 'granted';
+  });
+
+  // Register or request FCM push token on mount if user is logged in
+  useEffect(() => {
+    if (!user) return;
+    if ('Notification' in window && Notification.permission === 'granted') {
+      requestFcmNotificationPermission(user.uid, user.role);
+    }
+
+    // Register foreground FCM message handler
+    let unsubscribeFcm: (() => void) | undefined;
+    registerFcmForegroundHandler((payload) => {
+      const title = payload.notification?.title || payload.data?.title || '🚨 EMERGENCY SOS ALERT';
+      const body = payload.notification?.body || payload.data?.body || 'High priority danger reported.';
+      const link = payload.data?.link || '/incidents';
+      triggerHighSeverityToast(title, body, undefined, link);
+    }).then(unsub => {
+      unsubscribeFcm = unsub;
+    });
+
+    return () => {
+      if (unsubscribeFcm) unsubscribeFcm();
+    };
+  }, [user]);
+
+  const handleEnablePush = async () => {
+    if (!user) return;
+    const res = await requestFcmNotificationPermission(user.uid, user.role);
+    if (res.granted) {
+      setPushEnabled(true);
+      toast.success('Push Notifications Enabled!', {
+        description: 'You will receive immediate system alerts when a Danger SOS is triggered.'
+      });
+    } else {
+      toast.error('Notification Permission Denied', {
+        description: 'Please allow notifications in your browser settings to receive SOS push alerts.'
+      });
+    }
+  };
 
   // Track initial load to prevent toast spam for historical records
   const isInitialNotificationLoad = useRef(true);
@@ -122,7 +168,7 @@ export default function NotificationCenter() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
       setNotifications(docs);
       setUnreadCount(docs.filter(n => !n.read).length);
 
@@ -137,7 +183,7 @@ export default function NotificationCenter() {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const id = change.doc.id;
-          const data = change.doc.data() as Notification;
+          const data = change.doc.data() as AppNotification;
           if (!toastedNotificationIds.current.has(id) && !data.read) {
             toastedNotificationIds.current.add(id);
 
@@ -149,6 +195,13 @@ export default function NotificationCenter() {
 
             if (isHighOrCritical) {
               triggerHighSeverityToast(data.title, data.message, undefined, data.link);
+              // Trigger system notification if tab is in background or active
+              triggerSystemPushNotification({
+                title: data.title,
+                body: data.message,
+                link: data.link || '/incidents',
+                isSosAlert: true
+              });
             } else {
               toast(data.title, {
                 description: data.message,
@@ -200,6 +253,12 @@ export default function NotificationCenter() {
                 incident.pollingUnitId,
                 `/incidents/${id}`
               );
+              triggerSystemPushNotification({
+                title: `🚨 ${incident.severity.toUpperCase()} SEVERITY INCIDENT: ${incident.pollingUnitId || 'PU-FIELD'}`,
+                body: incident.description,
+                link: `/incidents/${id}`,
+                isSosAlert: true
+              });
             }
           }
         }
@@ -279,6 +338,26 @@ export default function NotificationCenter() {
                 >
                   <X className="w-4 h-4" />
                 </button>
+              </div>
+
+              {/* FCM Push Notification Status Banner */}
+              <div className="px-6 py-2 bg-slate-900 text-white border-b border-slate-800 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${pushEnabled ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+                  <span className="font-bold text-[11px]">
+                    {pushEnabled ? 'Push Alerts Active' : 'Push Notifications Disabled'}
+                  </span>
+                </div>
+                {!pushEnabled ? (
+                  <button
+                    onClick={handleEnablePush}
+                    className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-xs"
+                  >
+                    Enable Push
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold">FCM Sync Ready</span>
+                )}
               </div>
 
               {(isAdmin || isSupervisor) && (

@@ -15,6 +15,12 @@ export interface PendingReport {
     description: string;
     voterCount?: number;
     severity?: Severity;
+    electionLevel?: string;
+    apcVotes?: number;
+    pdpVotes?: number;
+    lpVotes?: number;
+    nnppVotes?: number;
+    otherVotes?: number;
   };
   status: 'pending' | 'syncing' | 'failed';
   errorMessage?: string;
@@ -169,6 +175,12 @@ export const syncPendingReports = async (observerId?: string) => {
           description: item.payload.description,
           voterCount: item.payload.voterCount,
           severity: item.payload.severity,
+          electionLevel: item.payload.electionLevel,
+          apcVotes: item.payload.apcVotes,
+          pdpVotes: item.payload.pdpVotes,
+          lpVotes: item.payload.lpVotes,
+          nnppVotes: item.payload.nnppVotes,
+          otherVotes: item.payload.otherVotes,
         },
       };
 
