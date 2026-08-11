@@ -23,8 +23,8 @@ interface TimeLeft {
   isPassed: boolean;
 }
 
-// Scheduled date for the Osun State Off-Cycle Gubernatorial Election: Saturday, August 8, 2026 at 08:00 WAT
-const ELECTION_TARGET_DATE = new Date('2026-08-08T08:00:00+01:00').getTime();
+// Scheduled date for the Osun State Off-Cycle Gubernatorial Election: Saturday, August 15, 2026 at 08:00 WAT
+const ELECTION_TARGET_DATE = new Date('2026-08-15T08:00:00+01:00').getTime();
 
 export default function OsunCountdown() {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0, isPassed: false });
@@ -86,7 +86,7 @@ export default function OsunCountdown() {
 
           <div className="flex items-center gap-2 text-xs text-gray-300 bg-slate-800/80 backdrop-blur-md border border-slate-700 px-4 py-2 rounded-xl">
             <Calendar className="w-4 h-4 text-emerald-400" />
-            <span className="font-semibold">Saturday, August 8, 2026</span>
+            <span className="font-semibold">Saturday, August 15, 2026</span>
           </div>
         </div>
 

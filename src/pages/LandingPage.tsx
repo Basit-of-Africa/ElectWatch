@@ -33,6 +33,8 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
+import OsunCountdown from '../components/OsunCountdown';
+
 // Dedicated display interface for the public live feed
 export interface PublicDisplayReport {
   id: string;
@@ -465,6 +467,11 @@ export default function LandingPage() {
                 </Link>
               )}
             </div>
+          </div>
+
+          {/* FEATURED RACE COUNTDOWN - OSUN STATE GUBERNATORIAL ELECTION */}
+          <div className="pt-2">
+            <OsunCountdown />
           </div>
 
           {/* KPI CARDS GRID */}
