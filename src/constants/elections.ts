@@ -7,6 +7,12 @@ export const ELECTION_LEVEL_LABELS: Record<string, { label: string; short: strin
     color: 'text-emerald-700',
     bg: 'bg-emerald-50 border-emerald-200'
   },
+  general_federal: {
+    label: '2027 General Election (Presidential, Senate & House of Reps)',
+    short: 'Presidential & NASS (2027)',
+    color: 'text-purple-700',
+    bg: 'bg-purple-50 border-purple-200'
+  },
   presidential: {
     label: 'Presidential Election',
     short: 'Presidential',
@@ -39,31 +45,13 @@ export const AVAILABLE_ELECTIONS: ElectionScope[] = [
     description: 'Off-cycle governorship election observation across all 30 LGAs in Osun State.'
   },
   {
-    id: 'gen-2027-presidential',
-    name: '2027 Nigerian General Election - Presidential',
-    level: 'presidential',
+    id: 'gen-2027-federal',
+    name: '2027 General Election (Presidential, Senate & House of Reps)',
+    level: 'general_federal',
     year: 2027,
     isOffCycle: false,
     isActiveDefault: false,
-    description: 'National presidential election monitoring across all 36 states and FCT Abuja.'
-  },
-  {
-    id: 'gen-2027-senatorial',
-    name: '2027 Nigerian General Election - Senate',
-    level: 'senatorial',
-    year: 2027,
-    isOffCycle: false,
-    isActiveDefault: false,
-    description: 'Senatorial election monitoring across 109 senatorial districts in Nigeria.'
-  },
-  {
-    id: 'gen-2027-house-reps',
-    name: '2027 Nigerian General Election - House of Reps',
-    level: 'house_of_reps',
-    year: 2027,
-    isOffCycle: false,
-    isActiveDefault: false,
-    description: 'Federal House of Representatives election monitoring across 360 federal constituencies.'
+    description: 'Unified 2027 Federal General Election covering Presidential, Senatorial, and House of Representatives voting conducted concurrently.'
   },
   {
     id: 'gen-2027-gubernatorial-national',

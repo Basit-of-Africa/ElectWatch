@@ -49,7 +49,7 @@ export default function ElectionScopeSelector({
             >
               <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between text-[10px] uppercase tracking-wider font-extrabold text-emerald-400">
                 <span>Select Election Scope</span>
-                <span>4 Levels Supported</span>
+                <span>General & Off-Cycle</span>
               </div>
               <div className="py-1 space-y-1 max-h-72 overflow-y-auto custom-scrollbar">
                 {AVAILABLE_ELECTIONS.map((scope) => {

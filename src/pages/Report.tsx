@@ -30,7 +30,7 @@ import DangerButton from '../components/DangerButton';
 
 const reportSchema = z.object({
   pollingUnitId: z.string().min(1, 'Polling Unit ID is required'),
-  electionLevel: z.enum(['governorship', 'presidential', 'senatorial', 'house_of_reps']),
+  electionLevel: z.enum(['governorship', 'general_federal', 'presidential', 'senatorial', 'house_of_reps']),
   type: z.enum(['accreditation', 'incident', 'result']),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   voterCount: z.number().optional(),
@@ -401,12 +401,10 @@ export default function Report() {
             <label className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-widest px-1">
               Election Level / Category
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
-                { id: 'governorship', name: 'Gubernatorial', sub: 'Osun Off-Cycle / State', badge: 'Active Default' },
-                { id: 'presidential', name: 'Presidential', sub: '2027 General Election', badge: 'National' },
-                { id: 'senatorial', name: 'Senatorial', sub: 'Senate Constituency', badge: 'National' },
-                { id: 'house_of_reps', name: 'House of Reps', sub: 'Federal Constituency', badge: 'National' },
+                { id: 'governorship', name: 'Gubernatorial Election', sub: 'Osun State Off-Cycle & 2027 State Governorships', badge: 'Active Default' },
+                { id: 'general_federal', name: '2027 General Election (Presidential & NASS)', sub: 'Presidential, Senate & House of Reps (Held Concurrently)', badge: '2027 General' },
               ].map((lvl) => {
                 const isSel = watch('electionLevel') === lvl.id;
                 return (

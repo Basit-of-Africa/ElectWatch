@@ -2,7 +2,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'admin' | 'supervisor' | 'observer';
 
-export type ElectionLevel = 'governorship' | 'presidential' | 'senatorial' | 'house_of_reps';
+export type ElectionLevel = 'governorship' | 'general_federal' | 'presidential' | 'senatorial' | 'house_of_reps';
 
 export interface ElectionScope {
   id: string;
