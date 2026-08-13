@@ -50,12 +50,19 @@ import AttendanceDashboard from '../components/AttendanceDashboard';
 import NationalOverview from '../components/NationalOverview';
 import IncidentHistory from '../components/IncidentHistory';
 import OsunCountdown from '../components/OsunCountdown';
+import DirectiveBroadcastModal from '../components/DirectiveBroadcastModal';
+import HQDirectivesFeed from '../components/HQDirectivesFeed';
+import { 
+  Radio, 
+  Megaphone 
+} from 'lucide-react';
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isExportingCSV, setIsExportingCSV] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     incidents: 0,
@@ -315,6 +322,17 @@ export default function Dashboard() {
             <span>Incident History</span>
           </a>
 
+          {/* Admin & Supervisor Broadcast Directive Button */}
+          {(isAdmin || isSupervisor) && (
+            <button
+              onClick={() => setShowBroadcastModal(true)}
+              className="flex items-center gap-2 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer"
+            >
+              <Radio className="w-4 h-4 animate-pulse text-emerald-200" />
+              <span>Broadcast Directive</span>
+            </button>
+          )}
+
           {/* Quick Actions for Observer */}
           {!isAdmin && !isSupervisor && (
             <Link 
@@ -349,6 +367,15 @@ export default function Dashboard() {
 
       {/* Osun State Gubernatorial Election Dynamic Countdown */}
       <OsunCountdown />
+
+      {/* HQ Command Directives & Official Updates Feed */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+      >
+        <HQDirectivesFeed onOpenBroadcastModal={() => setShowBroadcastModal(true)} />
+      </motion.div>
 
       {/* Stats Grid - Tailored per role */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -896,6 +923,12 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Directive & Administrative Memo Broadcast Modal */}
+      <DirectiveBroadcastModal 
+        isOpen={showBroadcastModal} 
+        onClose={() => setShowBroadcastModal(false)} 
+      />
     </div>
   );
 }

@@ -85,10 +85,10 @@ service cloud.firestore {
 
     function isValidNotification(data) {
       return data.keys().hasAll(['userId', 'title', 'message', 'type', 'read', 'timestamp']) &&
-             data.keys().size() <= 8 && // Allow link
-             data.title is string && data.title.size() <= 200 &&
-             data.message is string && data.message.size() <= 1000 &&
-             data.type in ['info', 'warning', 'error', 'success'] &&
+             data.keys().size() <= 15 && // Allow link, senderName, senderRole, priority, targetRole, category, targetState, acknowledgedBy
+             data.title is string && data.title.size() <= 250 &&
+             data.message is string && data.message.size() <= 2000 &&
+             data.type in ['info', 'warning', 'error', 'success', 'urgent_directive', 'admin_update'] &&
              data.read is bool;
     }
 
@@ -138,7 +138,7 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isValidNotification(incoming());
       allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSupervisor();
     }
   }
 }

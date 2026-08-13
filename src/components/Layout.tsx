@@ -7,6 +7,7 @@ import OfflineSyncBanner from './OfflineSyncBanner';
 import FirstTimeLocationPrompt from './FirstTimeLocationPrompt';
 import DangerButton from './DangerButton';
 import ActiveSOSBanner from './ActiveSOSBanner';
+import ActiveDirectivesBanner from './ActiveDirectivesBanner';
 import InstallPWABanner, { InstallPWAButton } from './InstallPWA';
 import ElectionScopeSelector from './ElectionScopeSelector';
 import ObserverOnboarding from './ObserverOnboarding';
@@ -264,7 +265,8 @@ export default function Layout() {
         <FirstTimeLocationPrompt />
         <InstallPWABanner />
 
-        <div className="p-6 md:p-10 lg:p-12 max-w-7xl mx-auto w-full">
+        <div className="p-6 md:p-10 lg:p-12 max-w-7xl mx-auto w-full space-y-6">
+          <ActiveDirectivesBanner />
           <Outlet />
         </div>
       </main>

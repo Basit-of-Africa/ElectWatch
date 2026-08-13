@@ -103,12 +103,21 @@ export interface Incident {
   }[];
 }
 
+export type NotificationType = 'info' | 'warning' | 'error' | 'success' | 'urgent_directive' | 'admin_update';
+
 export interface Notification {
   id: string;
-  userId: string; // Target user or 'admin' / 'supervisor' for roles
+  userId: string; // Target user or 'admin' / 'supervisor' / 'field_supervisor' / 'observer' / 'all'
   title: string;
   message: string;
-  type: 'info' | 'warning' | 'error' | 'success';
+  type: NotificationType;
+  category?: 'directive' | 'update' | 'incident' | 'system';
+  priority?: 'normal' | 'urgent' | 'critical';
+  senderName?: string;
+  senderRole?: string;
+  targetRole?: 'all' | 'observer' | 'supervisor' | 'field_supervisor' | 'admin';
+  targetState?: string;
+  acknowledgedBy?: string[];
   read: boolean;
   link?: string;
   timestamp: string | Timestamp;

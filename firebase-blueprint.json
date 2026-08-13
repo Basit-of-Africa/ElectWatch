@@ -8,7 +8,7 @@
         "uid": { "type": "string" },
         "displayName": { "type": "string" },
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["admin", "supervisor", "observer"] },
+        "role": { "type": "string", "enum": ["admin", "field_supervisor", "supervisor", "observer"] },
         "assignedPollingUnitId": { "type": "string", "description": "The ID of the polling unit assigned to this observer." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -85,14 +85,20 @@
     },
     "Notification": {
       "title": "Notification",
-      "description": "A system alert for a user or role.",
+      "description": "A system alert, urgent directive, or administrative memo for field personnel.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
         "title": { "type": "string" },
         "message": { "type": "string" },
-        "type": { "type": "string", "enum": ["info", "warning", "error", "success"] },
+        "type": { "type": "string", "enum": ["info", "warning", "error", "success", "urgent_directive", "admin_update"] },
+        "category": { "type": "string", "enum": ["directive", "update", "incident", "system"] },
+        "priority": { "type": "string", "enum": ["normal", "urgent", "critical"] },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "targetState": { "type": "string" },
         "read": { "type": "boolean" },
         "link": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" }
