@@ -41,7 +41,7 @@ interface IncidentHistory {
 
 export default function IncidentDetail() {
   const { id } = useParams<{ id: string }>();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSupervisor } = useAuth();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [observer, setObserver] = useState<User | null>(null);
@@ -425,8 +425,8 @@ export default function IncidentDetail() {
 
         {/* Sidebar: Observer & History */}
         <div className="space-y-10">
-          {/* Admin Controls */}
-          {isAdmin && (
+          {/* Resolution Controls */}
+          {(isAdmin || isSupervisor) && (
             <motion.div 
                initial={{ opacity: 0, x: 10 }}
                animate={{ opacity: 1, x: 0 }}

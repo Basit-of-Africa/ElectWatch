@@ -197,31 +197,24 @@ export default function NationalOverview() {
     };
   }, [reports, incidents, observers, timeRange, selectedState]);
 
-  // 1. Prepare Hourly Incident Trends Data for Recharts AreaChart
+  // 1. Prepare Hourly Incident Trends Data for Recharts AreaChart purely from real incidents
   const incidentTrendsData = useMemo(() => {
     // Standard election day hours timeline (08:00 to 18:00)
     const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
     
-    // Baseline distribution for election day activity + real Firestore incident mapping
     const hourlyMap: Record<string, { critical: number; high: number; medium: number; low: number; total: number }> = {};
     
-    hours.forEach((hr, idx) => {
-      // Baseline realistic election day simulation curve
-      const baseCritical = Math.floor(Math.sin(idx / 3) * 2 + (idx === 4 ? 3 : 1));
-      const baseHigh = Math.floor(Math.cos(idx / 2) * 3 + 4);
-      const baseMedium = Math.floor(Math.sin(idx / 2) * 4 + 6);
-      const baseLow = Math.floor(idx * 0.8 + 3);
-
+    hours.forEach((hr) => {
       hourlyMap[hr] = {
-        critical: Math.max(0, baseCritical),
-        high: Math.max(0, baseHigh),
-        medium: Math.max(0, baseMedium),
-        low: Math.max(0, baseLow),
-        total: baseCritical + baseHigh + baseMedium + baseLow
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        total: 0
       };
     });
 
-    // Merge real Firestore incidents into hourly buckets
+    // Aggregate real Firestore incidents into hourly buckets
     filteredData.incidents.forEach(inc => {
       if (!inc.timestamp) return;
       const d = new Date(typeof inc.timestamp === 'string' ? inc.timestamp : (inc.timestamp as any).seconds * 1000);
@@ -248,19 +241,21 @@ export default function NationalOverview() {
     }));
   }, [filteredData.incidents]);
 
-  // 2. Prepare Polling Station Operational Status Distribution (Donut / PieChart)
+  // 2. Prepare Polling Station Operational Status Distribution (Donut / PieChart) from real reports
   const pollingStationStatusData = useMemo(() => {
-    const checkedInCount = filteredData.observers.filter(o => o.checkInStatus === 'checked_in').length;
-    const enRouteCount = filteredData.observers.filter(o => o.checkInStatus === 'en_route').length;
-    const pendingCount = filteredData.observers.filter(o => !o.checkInStatus || o.checkInStatus === 'not_checked_in').length;
-    const incidentCount = filteredData.incidents.filter(i => i.severity === 'critical' || i.severity === 'high').length;
+    const openAccrediting = filteredData.reports.filter(r => r.type === 'accreditation' || (r.payload?.accreditation && r.payload.accreditation !== 'Delayed')).length;
+    const votingInProgress = filteredData.reports.filter(r => r.type === 'normal' || (r.payload?.turnout && r.type !== 'incident')).length;
+    const countingCollation = filteredData.reports.filter(r => r.type === 'result').length;
+    const delayedMaterials = filteredData.reports.filter(r => r.payload?.materials === 'Incomplete' || r.payload?.accreditation === 'Delayed').length;
+    const disruptedIncident = filteredData.incidents.length;
 
-    // Baseline scaling for national perspective
-    const openAccrediting = Math.max(420, checkedInCount * 15 + 180);
-    const votingInProgress = Math.max(310, checkedInCount * 12 + 140);
-    const countingCollation = Math.max(120, Math.floor(filteredData.reports.length * 2.5) + 60);
-    const delayedMaterials = Math.max(65, pendingCount * 4 + 25);
-    const disruptedIncident = Math.max(28, incidentCount * 3 + 12);
+    const totalSum = openAccrediting + votingInProgress + countingCollation + delayedMaterials + disruptedIncident;
+
+    if (totalSum === 0) {
+      return [
+        { name: 'Awaiting Station Reports', value: 1, color: '#e2e8f0' }
+      ];
+    }
 
     return [
       { name: 'Open & Accrediting', value: openAccrediting, color: '#141A56' },
@@ -268,29 +263,24 @@ export default function NationalOverview() {
       { name: 'Counting & Collation', value: countingCollation, color: '#8b5cf6' },
       { name: 'Delayed / Materials Pending', value: delayedMaterials, color: '#f59e0b' },
       { name: 'Disrupted / Incident', value: disruptedIncident, color: '#ef4444' }
-    ];
-  }, [filteredData.observers, filteredData.reports, filteredData.incidents]);
+    ].filter(item => item.value > 0);
+  }, [filteredData.reports, filteredData.incidents]);
 
   // 3. Prepare State / Regional Report Volume Comparison (BarChart)
   const stateReportComparisonData = useMemo(() => {
-    const topStates = ['Lagos', 'Kano', 'Rivers', 'FCT Abuja', 'Oyo', 'Enugu', 'Kaduna', 'Edo'];
+    const topStates = ['Lagos', 'Kano', 'Rivers', 'FCT Abuja', 'Oyo', 'Enugu', 'Kaduna', 'Edo', 'Osun'];
 
-    return topStates.map((st, i) => {
-      // Find real Firestore counts for state
+    return topStates.map((st) => {
       const realAcc = filteredData.reports.filter(r => r.type === 'accreditation' && (r.payload?.state === st || r.payload?.lga?.toLowerCase().includes(st.toLowerCase()))).length;
       const realInc = filteredData.reports.filter(r => r.type === 'incident' && (r.payload?.state === st || r.payload?.lga?.toLowerCase().includes(st.toLowerCase()))).length;
       const realRes = filteredData.reports.filter(r => r.type === 'result' && (r.payload?.state === st || r.payload?.lga?.toLowerCase().includes(st.toLowerCase()))).length;
 
-      const baseAcc = 85 + (i * 12) % 45 + realAcc * 5;
-      const baseInc = 18 + (i * 7) % 22 + realInc * 4;
-      const baseRes = 42 + (i * 9) % 35 + realRes * 3;
-
       return {
         state: st,
-        Accreditation: baseAcc,
-        Incidents: baseInc,
-        Results: baseRes,
-        Total: baseAcc + baseInc + baseRes
+        Accreditation: realAcc,
+        Incidents: realInc,
+        Results: realRes,
+        Total: realAcc + realInc + realRes
       };
     });
   }, [filteredData.reports]);
@@ -299,12 +289,17 @@ export default function NationalOverview() {
   const incidentResolutionData = useMemo(() => {
     const categories = ['BVAS Failure', 'Voter Intimidation', 'Late Opening', 'Ballot Snatching', 'Logistics Delay', 'Crowd Surge'];
 
-    return categories.map((cat, idx) => {
-      const resolved = 24 + idx * 6;
-      const investigating = 12 + (idx % 3) * 4;
-      const pending = 8 + (idx % 2) * 5;
+    return categories.map((cat) => {
+      const matching = filteredData.incidents.filter(i => {
+        const text = ((i.title || '') + ' ' + (i.description || '') + ' ' + (i.type || '')).toLowerCase();
+        const catWords = cat.toLowerCase().split(' ');
+        return catWords.some(w => text.includes(w));
+      });
+      const resolved = matching.filter(i => i.status === 'resolved').length;
+      const investigating = matching.filter(i => i.status === 'investigating').length;
+      const pending = matching.filter(i => !i.status || i.status === 'pending').length;
       const total = resolved + investigating + pending;
-      const resolutionRate = Math.round((resolved / total) * 100);
+      const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
 
       return {
         category: cat,
@@ -314,15 +309,16 @@ export default function NationalOverview() {
         ResolutionRate: resolutionRate
       };
     });
-  }, []);
+  }, [filteredData.incidents]);
 
   // Totals & Metrics
-  const totalReportsCount = filteredData.reports.length || 148;
-  const totalIncidentsCount = filteredData.incidents.length || 38;
-  const criticalIncidentsCount = filteredData.incidents.filter(i => i.severity === 'critical').length || 7;
+  const totalReportsCount = filteredData.reports.length;
+  const totalIncidentsCount = filteredData.incidents.length;
+  const criticalIncidentsCount = filteredData.incidents.filter(i => i.severity === 'critical').length;
   const checkedInObserversCount = filteredData.observers.filter(o => o.checkInStatus === 'checked_in').length;
-  const totalObserversCount = filteredData.observers.length || 12;
-  const attendanceRatePct = totalObserversCount > 0 ? Math.round((checkedInObserversCount / totalObserversCount) * 100) : 85;
+  const totalObserversCount = filteredData.observers.length;
+  const attendanceRatePct = totalObserversCount > 0 ? Math.round((checkedInObserversCount / totalObserversCount) * 100) : 0;
+  const reportingStationsCount = new Set(filteredData.reports.map(r => r.pollingUnitId || r.payload?.pollingUnitId).filter(Boolean)).size;
 
   return (
     <div className="space-y-6">
@@ -414,9 +410,9 @@ export default function NationalOverview() {
             <Building2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-serif font-extrabold text-gray-900">176,846</span>
+            <span className="text-3xl font-serif font-extrabold text-gray-900">{reportingStationsCount}</span>
             <span className="text-xs font-bold text-emerald-600 flex items-center gap-0.5">
-              <TrendingUp className="w-3 h-3" /> 94.2%
+              <TrendingUp className="w-3 h-3" /> Transmitting
             </span>
           </div>
           <div className="text-[11px] text-gray-500 font-medium">Active Polling Stations Online</div>

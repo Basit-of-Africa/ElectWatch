@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User } from '../types';
@@ -54,142 +54,6 @@ export interface PublicDisplayReport {
   incidents?: string;
   timestamp: string;
 }
-
-// Seed sample reports for public demonstration if Firestore has low initial entries
-const PUBLIC_SEED_REPORTS: PublicDisplayReport[] = [
-  {
-    id: 'RPT-1001',
-    observerId: 'obs-lagos-01',
-    observerName: 'Accredited Field Observer',
-    type: 'normal',
-    state: 'Lagos',
-    lga: 'Ikeja',
-    ward: 'Ward 02',
-    pollingUnitId: 'PU-LAG-014',
-    pollingUnitName: 'Ikeja Primary School, Ward 02',
-    details: 'Voting commenced peacefully. All INEC materials present. BVAS devices fully operational. Approximately 180 voters queuing orderly with heavy security presence.',
-    turnout: 'High',
-    security: 'Peaceful',
-    accreditation: 'Smooth',
-    materials: 'Complete',
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString()
-  },
-  {
-    id: 'RPT-1002',
-    observerId: 'obs-kano-04',
-    observerName: 'Accredited Field Observer',
-    type: 'incident',
-    state: 'Kano',
-    lga: 'Kano Municipal',
-    ward: "Emir's Palace Ward",
-    pollingUnitId: 'PU-KN-102',
-    pollingUnitName: 'Kano Central Library, Ward 05',
-    details: 'Ballot box observed without tamper-evident seal. Reported to Presiding Officer immediately. Security personnel monitoring closely.',
-    turnout: 'Moderate',
-    security: 'Tense',
-    accreditation: 'Delayed',
-    materials: 'Incomplete',
-    incidents: 'Missing ballot box seal',
-    timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString()
-  },
-  {
-    id: 'RPT-1003',
-    observerId: 'obs-abuja-02',
-    observerName: 'Accredited Field Observer',
-    type: 'normal',
-    state: 'FCT',
-    lga: 'Abuja Municipal',
-    ward: 'Garki Ward II',
-    pollingUnitId: 'PU-FCT-042',
-    pollingUnitName: 'Garki Model Secondary, Area 11',
-    details: 'Materials in order. INEC staff present and professional. Accreditation ongoing smoothly. All accredited party agents present.',
-    turnout: 'Moderate',
-    security: 'Peaceful',
-    accreditation: 'Smooth',
-    materials: 'Complete',
-    timestamp: new Date(Date.now() - 1000 * 60 * 42).toISOString()
-  },
-  {
-    id: 'RPT-1004',
-    observerId: 'obs-rivers-03',
-    observerName: 'Accredited Field Observer',
-    type: 'warning',
-    state: 'Rivers',
-    lga: 'Port Harcourt',
-    ward: 'D-Line Ward 01',
-    pollingUnitId: 'PU-RV-089',
-    pollingUnitName: 'Port Harcourt Township Hall',
-    details: 'Large crowd gathering outside the exclusion perimeter. Security forces present but requesting additional reinforcement to manage queue flow.',
-    turnout: 'High',
-    security: 'Tense',
-    accreditation: 'Delayed',
-    materials: 'Complete',
-    incidents: 'Overcrowding outside perimeter',
-    timestamp: new Date(Date.now() - 1000 * 60 * 58).toISOString()
-  },
-  {
-    id: 'RPT-1005',
-    observerId: 'obs-oyo-05',
-    observerName: 'Accredited Field Observer',
-    type: 'info',
-    state: 'Oyo',
-    lga: 'Ibadan North',
-    ward: 'Bodija Ward I',
-    pollingUnitId: 'SUP-OYO-01',
-    pollingUnitName: 'Ibadan North Zonal Operations',
-    details: 'Polling unit opened 35 minutes behind schedule due to transport logistics. Technical team resolved BVAS calibration. Now fully operational.',
-    turnout: 'High',
-    security: 'Peaceful',
-    accreditation: 'Smooth',
-    materials: 'Complete',
-    timestamp: new Date(Date.now() - 1000 * 60 * 75).toISOString()
-  },
-  {
-    id: 'RPT-1006',
-    observerId: 'obs-kaduna-06',
-    observerName: 'Accredited Field Observer',
-    type: 'normal',
-    state: 'Kaduna',
-    lga: 'Kaduna North',
-    ward: 'Shaba Ward',
-    pollingUnitId: 'PU-KD-022',
-    pollingUnitName: 'Kaduna City Hall PU',
-    details: 'Smooth accreditation process. Approximately 310 voters processed. High female turnout recorded. Good community cooperation.',
-    turnout: 'High',
-    security: 'Peaceful',
-    accreditation: 'Smooth',
-    materials: 'Complete',
-    timestamp: new Date(Date.now() - 1000 * 60 * 95).toISOString()
-  }
-];
-
-// Sample Polling Unit Matrix Cells for Heatmap
-const SAMPLE_HEATMAP_CELLS = [
-  { id: 1, name: 'PU-LAG-014', state: 'Lagos', status: 'normal', label: 'Normal' },
-  { id: 2, name: 'PU-KN-102', state: 'Kano', status: 'incident', label: 'Missing Seal' },
-  { id: 3, name: 'PU-FCT-042', state: 'FCT', status: 'normal', label: 'Normal' },
-  { id: 4, name: 'PU-RV-089', state: 'Rivers', status: 'warning', label: 'Overcrowding' },
-  { id: 5, name: 'PU-OYO-01', state: 'Oyo', status: 'normal', label: 'Normal' },
-  { id: 6, name: 'PU-KD-022', state: 'Kaduna', status: 'normal', label: 'Normal' },
-  { id: 7, name: 'PU-AN-055', state: 'Anambra', status: 'critical', label: 'Snatching Attempt' },
-  { id: 8, name: 'PU-ED-012', state: 'Edo', status: 'normal', label: 'Normal' },
-  { id: 9, name: 'PU-LAG-088', state: 'Lagos', status: 'warning', label: 'BVAS Delay' },
-  { id: 10, name: 'PU-KN-044', state: 'Kano', status: 'normal', label: 'Normal' },
-  { id: 11, name: 'PU-FCT-011', state: 'FCT', status: 'normal', label: 'Normal' },
-  { id: 12, name: 'PU-OG-033', state: 'Ogun', status: 'normal', label: 'Normal' },
-  { id: 13, name: 'PU-RV-102', state: 'Rivers', status: 'warning', label: 'Tense Crowd' },
-  { id: 14, name: 'PU-PL-009', state: 'Plateau', status: 'normal', label: 'Normal' },
-  { id: 15, name: 'PU-BO-077', state: 'Borno', status: 'normal', label: 'Normal' },
-  { id: 16, name: 'PU-AK-021', state: 'Akwa Ibom', status: 'normal', label: 'Normal' },
-  { id: 17, name: 'PU-LAG-110', state: 'Lagos', status: 'normal', label: 'Normal' },
-  { id: 18, name: 'PU-EN-066', state: 'Enugu', status: 'normal', label: 'Normal' },
-  { id: 19, name: 'PU-SK-014', state: 'Sokoto', status: 'warning', label: 'Late Arrival' },
-  { id: 20, name: 'PU-IM-031', state: 'Imo', status: 'normal', label: 'Normal' },
-  { id: 21, name: 'PU-KG-018', state: 'Kogi', status: 'normal', label: 'Normal' },
-  { id: 22, name: 'PU-OS-052', state: 'Osun', status: 'normal', label: 'Normal' },
-  { id: 23, name: 'PU-BY-007', state: 'Bayelsa', status: 'normal', label: 'Normal' },
-  { id: 24, name: 'PU-ZA-019', state: 'Zamfara', status: 'normal', label: 'Normal' },
-];
 
 function parseFirestoreReport(doc: any): PublicDisplayReport {
   const payload = doc.payload || {};
@@ -253,12 +117,7 @@ export default function LandingPage() {
     const unsubscribeReports = onSnapshot(collection(db, 'reports'), (snapshot) => {
       const parsedDocs = snapshot.docs.map(doc => parseFirestoreReport({ id: doc.id, ...doc.data() }));
 
-      // Merge Firestore reports with public seed reports
-      const map = new Map<string, PublicDisplayReport>();
-      PUBLIC_SEED_REPORTS.forEach(r => map.set(r.id, r));
-      parsedDocs.forEach(d => map.set(d.id, d));
-
-      const sorted = Array.from(map.values()).sort((a, b) => {
+      const sorted = parsedDocs.sort((a, b) => {
         const timeA = new Date(a.timestamp || 0).getTime();
         const timeB = new Date(b.timestamp || 0).getTime();
         return timeB - timeA;
@@ -267,8 +126,8 @@ export default function LandingPage() {
       setReports(sorted);
       setLoading(false);
     }, (error) => {
-      console.warn('Firestore reports error on landing page, using seed data:', error);
-      setReports(PUBLIC_SEED_REPORTS);
+      console.warn('Firestore reports error on landing page:', error);
+      setReports([]);
       setLoading(false);
     });
 
@@ -303,22 +162,22 @@ export default function LandingPage() {
     return matchesSearch && matchesType && matchesState;
   });
 
-  // Calculate Metrics
+  // Calculate Metrics from real Firestore stream
   const totalReportsCount = reports.length;
   const incidentCount = reports.filter(r => r.type === 'incident').length;
   const warningCount = reports.filter(r => r.type === 'warning').length;
   const normalCount = reports.filter(r => r.type === 'normal' || r.type === 'accreditation').length;
   const infoCount = reports.filter(r => r.type === 'info').length;
 
-  const activeObserversCount = Math.max(users.length, 18);
-  const statesReportingCount = new Set(reports.map(r => r.state).filter(Boolean)).size || 12;
+  const activeObserversCount = users.filter(u => u.role === 'observer' || u.role === 'supervisor').length || users.length;
+  const statesReportingCount = new Set(reports.map(r => r.state).filter(Boolean)).size;
 
   // Chart Data: Category Donut
   const categoryData = [
-    { name: 'Normal', value: normalCount || 1, color: '#141A56' },
-    { name: 'Incident', value: incidentCount || 1, color: '#EF4444' },
-    { name: 'Warning', value: warningCount || 1, color: '#F59E0B' },
-    { name: 'Information', value: infoCount || 1, color: '#3B82F6' },
+    { name: 'Normal', value: normalCount, color: '#141A56' },
+    { name: 'Incident', value: incidentCount, color: '#EF4444' },
+    { name: 'Warning', value: warningCount, color: '#F59E0B' },
+    { name: 'Information', value: infoCount, color: '#3B82F6' },
   ];
 
   // Chart Data: Security Situation Bar
@@ -329,10 +188,38 @@ export default function LandingPage() {
   }, {} as Record<string, number>);
 
   const securityChartData = [
-    { name: 'Peaceful', count: securityCounts['Peaceful'] || 14, fill: '#141A56' },
-    { name: 'Tense', count: securityCounts['Tense'] || 3, fill: '#F59E0B' },
-    { name: 'Violent', count: securityCounts['Violent'] || 1, fill: '#EF4444' },
+    { name: 'Peaceful', count: securityCounts['Peaceful'] || 0, fill: '#141A56' },
+    { name: 'Tense', count: securityCounts['Tense'] || 0, fill: '#F59E0B' },
+    { name: 'Violent', count: securityCounts['Violent'] || 0, fill: '#EF4444' },
   ];
+
+  // Dynamic Polling Unit Status Cells derived from real field submissions
+  const dynamicHeatmapCells = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; state: string; status: 'normal' | 'warning' | 'incident' | 'critical'; label: string }>();
+    reports.forEach((r, idx) => {
+      const puId = r.pollingUnitId || `PU-${idx + 1}`;
+      if (!map.has(puId)) {
+        let status: 'normal' | 'warning' | 'incident' | 'critical' = 'normal';
+        let label = 'Normal';
+        if (r.type === 'incident') {
+          const det = (r.details || '').toLowerCase();
+          status = det.includes('critical') || det.includes('snatch') || det.includes('violence') ? 'critical' : 'incident';
+          label = r.incidents || 'Incident Reported';
+        } else if (r.type === 'warning') {
+          status = 'warning';
+          label = 'Caution';
+        }
+        map.set(puId, {
+          id: puId,
+          name: puId,
+          state: r.state || 'Field',
+          status,
+          label
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [reports]);
 
   // State Breakdown List
   const stateCounts = reports.reduce((acc, r) => {
@@ -404,7 +291,7 @@ export default function LandingPage() {
                 className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-500 transition-all uppercase tracking-wider group"
               >
                 <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                Observer / Admin Sign In
+                Sign in
               </Link>
             )}
           </div>
@@ -841,10 +728,10 @@ export default function LandingPage() {
             <div>
               <h3 className="text-xl font-bold text-gray-900 font-serif flex items-center gap-2">
                 <Globe className="w-5 h-5 text-emerald-600" />
-                Polling Unit Status Heatmap Sample
+                Live Polling Unit Status Heatmap
               </h3>
               <p className="text-xs text-gray-500 font-medium mt-0.5">
-                Visual status matrix of sampled polling unit transmissions across key regions
+                Real-time operational status of reporting polling units across electoral wards
               </p>
             </div>
 
@@ -857,30 +744,40 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-3">
-            {SAMPLE_HEATMAP_CELLS.map((cell) => {
-              const bg =
-                cell.status === 'normal' ? 'bg-emerald-500 hover:bg-emerald-600' :
-                cell.status === 'warning' ? 'bg-amber-400 hover:bg-amber-500' :
-                cell.status === 'incident' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700';
+          {dynamicHeatmapCells.length === 0 ? (
+            <div className="py-12 px-4 text-center border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
+              <Radio className="w-8 h-8 text-gray-400 mx-auto mb-2 animate-pulse" />
+              <p className="text-sm font-bold text-gray-700">Awaiting Live Polling Unit Transmissions</p>
+              <p className="text-xs text-gray-500 max-w-md mx-auto mt-1">
+                As accredited field observers check in and submit observation reports, active polling unit telemetry blocks will appear here automatically.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-3">
+              {dynamicHeatmapCells.map((cell) => {
+                const bg =
+                  cell.status === 'normal' ? 'bg-emerald-500 hover:bg-emerald-600' :
+                  cell.status === 'warning' ? 'bg-amber-400 hover:bg-amber-500' :
+                  cell.status === 'incident' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700';
 
-              return (
-                <div
-                  key={cell.id}
-                  className={`${bg} h-14 rounded-2xl text-white p-2 text-center flex flex-col items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-xs group relative`}
-                >
-                  <span className="text-[10px] font-mono font-bold">{cell.name}</span>
-                  <span className="text-[9px] font-semibold opacity-80">{cell.state}</span>
+                return (
+                  <div
+                    key={cell.id}
+                    className={`${bg} h-14 rounded-2xl text-white p-2 text-center flex flex-col items-center justify-center transition-transform hover:scale-105 cursor-pointer shadow-xs group relative`}
+                  >
+                    <span className="text-[10px] font-mono font-bold truncate max-w-full">{cell.name}</span>
+                    <span className="text-[9px] font-semibold opacity-80 truncate max-w-full">{cell.state}</span>
 
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:block z-20 w-36 p-2 bg-gray-900 text-white text-[10px] rounded-xl shadow-xl pointer-events-none text-left">
-                    <p className="font-bold">{cell.name}</p>
-                    <p className="text-gray-300">{cell.state} — Status: {cell.label}</p>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 hidden group-hover:block z-20 w-36 p-2 bg-gray-900 text-white text-[10px] rounded-xl shadow-xl pointer-events-none text-left">
+                      <p className="font-bold">{cell.name}</p>
+                      <p className="text-gray-300">{cell.state} — Status: {cell.label}</p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       </main>
 

@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isSupervisor: boolean;
+  isFieldSupervisor: boolean;
   authError: string | null;
   clearAuthError: () => void;
 }
@@ -81,12 +82,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
+  const isSupervisor = user?.role === 'field_supervisor' || user?.role === 'supervisor';
+
   const value = {
     user,
     firebaseUser,
     loading,
     isAdmin: user?.role === 'admin' || firebaseUser?.email === PRIMARY_ADMIN_EMAIL,
-    isSupervisor: user?.role === 'supervisor',
+    isSupervisor,
+    isFieldSupervisor: isSupervisor,
     authError,
     clearAuthError,
   };

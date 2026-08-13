@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type UserRole = 'admin' | 'supervisor' | 'observer';
+export type UserRole = 'admin' | 'field_supervisor' | 'supervisor' | 'observer';
 
 export type ElectionLevel = 'governorship' | 'general_federal' | 'presidential' | 'senatorial' | 'house_of_reps';
 

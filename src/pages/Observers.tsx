@@ -47,7 +47,7 @@ interface ParsedObserverRow {
   displayName: string;
   email: string;
   phone: string;
-  role: 'observer' | 'supervisor';
+  role: 'observer' | 'field_supervisor' | 'supervisor' | 'admin';
   assignedPollingUnitId: string;
   assignedPollingUnitName: string;
   state: string;
@@ -56,85 +56,6 @@ interface ParsedObserverRow {
   validationError?: string;
   selected: boolean;
 }
-
-// Seed default observers for rich initial Admin display
-const DEFAULT_OBSERVERS: User[] = [
-  {
-    uid: 'obs-lagos-01',
-    displayName: 'Amina Bello',
-    email: 'amina.bello@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-LAG-014',
-    assignedPollingUnitName: 'Ikeja Primary School, Ward 02',
-    phone: '+234 802 345 6789',
-    status: 'active',
-    state: 'Lagos',
-    lga: 'Ikeja',
-    reportsCount: 12,
-    lastActive: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString()
-  },
-  {
-    uid: 'obs-abuja-02',
-    displayName: 'Chidi Okonkwo',
-    email: 'chidi.okonkwo@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-FCT-042',
-    assignedPollingUnitName: 'Garki Model Secondary, Area 11',
-    phone: '+234 803 987 6543',
-    status: 'active',
-    state: 'FCT',
-    lga: 'Abuja Municipal',
-    reportsCount: 8,
-    lastActive: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 25).toISOString()
-  },
-  {
-    uid: 'obs-rivers-03',
-    displayName: 'Blessing Nwosu',
-    email: 'blessing.nwosu@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-RV-089',
-    assignedPollingUnitName: 'Port Harcourt Township Hall',
-    phone: '+234 814 112 2334',
-    status: 'active',
-    state: 'Rivers',
-    lga: 'Port Harcourt',
-    reportsCount: 15,
-    lastActive: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString()
-  },
-  {
-    uid: 'obs-kano-04',
-    displayName: 'Ibrahim Danlami',
-    email: 'ibrahim.danlami@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-KN-102',
-    assignedPollingUnitName: 'Kano Central Library, Ward 05',
-    phone: '+234 805 443 3221',
-    status: 'inactive',
-    state: 'Kano',
-    lga: 'Kano Municipal',
-    reportsCount: 4,
-    lastActive: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15).toISOString()
-  },
-  {
-    uid: 'obs-oyO-05',
-    displayName: 'Folake Adeleke',
-    email: 'folake.adeleke@ivote.org',
-    role: 'supervisor',
-    assignedPollingUnitId: 'SUP-OYO-01',
-    assignedPollingUnitName: 'Ibadan North Zonal Operations',
-    phone: '+234 809 776 5544',
-    status: 'active',
-    state: 'Oyo',
-    lga: 'Ibadan North',
-    reportsCount: 22,
-    lastActive: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 40).toISOString()
-  }
-];
 
 export default function Observers() {
   const { isAdmin, isSupervisor } = useAuth();
@@ -170,7 +91,7 @@ export default function Observers() {
     displayName: '',
     email: '',
     phone: '',
-    role: 'observer' as 'observer' | 'supervisor',
+    role: 'observer' as 'observer' | 'field_supervisor' | 'supervisor' | 'admin',
     assignedPollingUnitId: '',
     assignedPollingUnitName: '',
     state: 'Lagos',
@@ -182,7 +103,7 @@ export default function Observers() {
     const templateContent = [
       'Name,Email,Phone,Role,Polling Unit ID,Polling Unit Name,State,LGA',
       'Kemi Adebayo,kemi.adebayo@ivote.org,+234 803 111 2233,observer,PU-LAG-016,Gbagada Comprehensive High School,Lagos,Kosofe',
-      'Farouk Usman,farouk.usman@ivote.org,+234 802 999 8877,supervisor,SUP-KN-02,Kano Central Zonal Hub,Kano,Kano Municipal',
+      'Farouk Usman,farouk.usman@ivote.org,+234 802 999 8877,field_supervisor,SUP-KN-02,Kano Central Zonal Hub,Kano,Kano Municipal',
       'David Okoh,david.okoh@ivote.org,+234 814 555 4433,observer,PU-RV-104,Rumuokwuta Girls Secondary,Rivers,Port Harcourt'
     ].join('\n');
 
@@ -243,7 +164,11 @@ export default function Observers() {
         const email = values[1] || '';
         const phone = values[2] || '';
         const rawRole = (values[3] || 'observer').toLowerCase();
-        const role = rawRole.includes('supervisor') ? 'supervisor' : 'observer';
+        const role: 'observer' | 'field_supervisor' | 'supervisor' | 'admin' = rawRole.includes('admin')
+          ? 'admin'
+          : rawRole.includes('supervisor')
+          ? 'field_supervisor'
+          : 'observer';
         const assignedPollingUnitId = values[4] || '';
         const assignedPollingUnitName = values[5] || '';
         const state = values[6] || 'Lagos';
@@ -356,24 +281,18 @@ export default function Observers() {
     const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
       
-      // Merge Firestore users with default seed users if they aren't already present
-      const map = new Map<string, User>();
-      DEFAULT_OBSERVERS.forEach(obs => map.set(obs.uid, obs));
-      docs.forEach(doc => {
-        if (doc.role === 'observer' || doc.role === 'supervisor' || doc.role === 'admin') {
-          map.set(doc.uid, {
-            ...map.get(doc.uid),
-            ...doc,
-            status: doc.status || 'active',
-          });
-        }
-      });
+      const realUsers = docs.filter(doc => 
+        doc.role === 'observer' || doc.role === 'supervisor' || doc.role === 'field_supervisor' || doc.role === 'admin'
+      ).map(doc => ({
+        ...doc,
+        status: doc.status || 'active',
+      }));
       
-      setObservers(Array.from(map.values()));
+      setObservers(realUsers);
       setLoading(false);
     }, (error) => {
-      console.warn('Firestore users error, falling back to seed observers:', error);
-      setObservers(DEFAULT_OBSERVERS);
+      console.warn('Firestore users error in Observers view:', error);
+      setObservers([]);
       setLoading(false);
     });
 
@@ -409,7 +328,8 @@ export default function Observers() {
       (obs.state && obs.state.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = statusFilter === 'all' || (obs.status || 'active') === statusFilter;
-    const matchesRole = roleFilter === 'all' || obs.role === roleFilter;
+    const matchesRole = roleFilter === 'all' || 
+      (roleFilter === 'field_supervisor' ? (obs.role === 'field_supervisor' || obs.role === 'supervisor') : obs.role === roleFilter);
 
     return matchesSearch && matchesStatus && matchesRole;
   });
@@ -769,7 +689,7 @@ export default function Observers() {
             >
               <option value="all">All Roles</option>
               <option value="observer">Field Observers</option>
-              <option value="supervisor">Supervisors</option>
+              <option value="field_supervisor">Field Supervisors</option>
               <option value="admin">Administrators</option>
             </select>
           </div>
@@ -840,14 +760,14 @@ export default function Observers() {
                       {/* Role & Status Badges */}
                       <td className="py-4 px-6">
                         <div className="flex flex-col items-start gap-1.5">
-                          <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md ${
+                          <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md border ${
                             obs.role === 'admin' 
-                              ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                              : obs.role === 'supervisor'
-                              ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              ? 'bg-purple-100 text-purple-700 border-purple-200'
+                              : (obs.role === 'field_supervisor' || obs.role === 'supervisor')
+                              ? 'bg-blue-100 text-blue-700 border-blue-200'
+                              : 'bg-emerald-100 text-emerald-800 border-emerald-200'
                           }`}>
-                            {obs.role === 'admin' ? 'Administrator' : obs.role === 'supervisor' ? 'Supervisor' : 'Field Observer'}
+                            {obs.role === 'admin' ? 'Administrator' : (obs.role === 'field_supervisor' || obs.role === 'supervisor') ? 'Field Supervisor' : 'Field Observer'}
                           </span>
 
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
@@ -1131,7 +1051,8 @@ export default function Observers() {
                       className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold bg-white"
                     >
                       <option value="observer">Field Observer</option>
-                      <option value="supervisor">Regional Supervisor</option>
+                      <option value="field_supervisor">Field Supervisor</option>
+                      <option value="admin">Administrator</option>
                     </select>
                   </div>
                 </div>

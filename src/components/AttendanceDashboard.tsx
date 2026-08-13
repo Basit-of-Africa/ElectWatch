@@ -313,8 +313,18 @@ export default function AttendanceDashboard({ compact = false }: AttendanceDashb
               <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-gray-900">{selectedObserver.displayName}</span>
-                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold uppercase rounded-lg text-[10px]">
-                    {selectedObserver.role}
+                  <span className={`px-2.5 py-1 font-bold uppercase rounded-lg text-[10px] border ${
+                    selectedObserver.role === 'admin'
+                      ? 'bg-purple-100 text-purple-800 border-purple-200'
+                      : (selectedObserver.role === 'field_supervisor' || selectedObserver.role === 'supervisor')
+                      ? 'bg-blue-100 text-blue-800 border-blue-200'
+                      : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                  }`}>
+                    {selectedObserver.role === 'admin'
+                      ? 'Administrator'
+                      : (selectedObserver.role === 'field_supervisor' || selectedObserver.role === 'supervisor')
+                      ? 'Field Supervisor'
+                      : 'Field Observer'}
                   </span>
                 </div>
                 <div className="text-gray-500 font-mono">{selectedObserver.email}</div>

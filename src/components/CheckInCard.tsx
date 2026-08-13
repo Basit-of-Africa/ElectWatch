@@ -169,10 +169,10 @@ export default function CheckInCard({ onCheckInSuccess }: CheckInCardProps) {
           <div className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Assigned Duty Station</div>
           <div className="font-bold text-gray-900 font-serif text-sm flex items-center gap-1.5">
             <MapPin className="w-4 h-4 text-emerald-600" />
-            {user?.assignedPollingUnitName || user?.assignedPollingUnitId || 'Ikeja Primary School, Ward 02 (PU-LAG-014)'}
+            {user?.assignedPollingUnitName || user?.assignedPollingUnitId || 'Duty Station Not Assigned'}
           </div>
           <div className="text-gray-500 text-[11px] font-medium">
-            State: <strong>{user?.state || 'Lagos'}</strong> {user?.lga ? `• LGA: ${user.lga}` : ''}
+            State: <strong>{user?.state || 'Unassigned'}</strong> {user?.lga ? `• LGA: ${user.lga}` : ''}
           </div>
         </div>
 

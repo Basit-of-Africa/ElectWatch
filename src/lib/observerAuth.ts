@@ -3,98 +3,6 @@ import { User as FirebaseUser, signOut } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { User } from '../types';
 
-// Default pre-authorized seed observers for demonstration & testing
-export const DEFAULT_AUTHORIZED_OBSERVERS: Partial<User>[] = [
-  {
-    displayName: 'Amina Bello',
-    email: 'amina.bello@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-LAG-014',
-    assignedPollingUnitName: 'Ikeja Primary School, Ward 02',
-    phone: '+234 802 345 6789',
-    state: 'Lagos',
-    lga: 'Ikeja',
-    status: 'active'
-  },
-  {
-    displayName: 'Chidi Okonkwo',
-    email: 'chidi.okonkwo@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-FCT-042',
-    assignedPollingUnitName: 'Garki Model Secondary, Area 11',
-    phone: '+234 803 987 6543',
-    state: 'FCT',
-    lga: 'Abuja Municipal',
-    status: 'active'
-  },
-  {
-    displayName: 'Blessing Nwosu',
-    email: 'blessing.nwosu@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-RV-089',
-    assignedPollingUnitName: 'Port Harcourt Township Hall',
-    phone: '+234 814 112 2334',
-    state: 'Rivers',
-    lga: 'Port Harcourt',
-    status: 'active'
-  },
-  {
-    displayName: 'Ibrahim Danlami',
-    email: 'ibrahim.danlami@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-KN-102',
-    assignedPollingUnitName: 'Kano Central Library, Ward 05',
-    phone: '+234 805 443 3221',
-    state: 'Kano',
-    lga: 'Kano Municipal',
-    status: 'inactive'
-  },
-  {
-    displayName: 'Folake Adeleke',
-    email: 'folake.adeleke@ivote.org',
-    role: 'supervisor',
-    assignedPollingUnitId: 'SUP-OYO-01',
-    assignedPollingUnitName: 'Ibadan North Zonal Operations',
-    phone: '+234 809 776 5544',
-    state: 'Oyo',
-    lga: 'Ibadan North',
-    status: 'active'
-  },
-  {
-    displayName: 'Kemi Adebayo',
-    email: 'kemi.adebayo@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-LAG-016',
-    assignedPollingUnitName: 'Gbagada Comprehensive High School',
-    phone: '+234 803 111 2233',
-    state: 'Lagos',
-    lga: 'Kosofe',
-    status: 'active'
-  },
-  {
-    displayName: 'Farouk Usman',
-    email: 'farouk.usman@ivote.org',
-    role: 'supervisor',
-    assignedPollingUnitId: 'SUP-KN-02',
-    assignedPollingUnitName: 'Kano Central Zonal Hub',
-    phone: '+234 802 999 8877',
-    state: 'Kano',
-    lga: 'Kano Municipal',
-    status: 'active'
-  },
-  {
-    displayName: 'David Okoh',
-    email: 'david.okoh@ivote.org',
-    role: 'observer',
-    assignedPollingUnitId: 'PU-RV-104',
-    assignedPollingUnitName: 'Rumuokwuta Girls Secondary',
-    phone: '+234 814 555 4433',
-    state: 'Rivers',
-    lga: 'Port Harcourt',
-    status: 'active'
-  }
-];
-
 export const PRIMARY_ADMIN_EMAIL = 'ajibadebasit40@gmail.com';
 
 /**
@@ -172,17 +80,7 @@ export async function authenticateAndAuthorizeUser(fUser: FirebaseUser): Promise
     console.warn('Error querying Firestore for imported observer email:', err);
   }
 
-  // 4. Fallback check against seed observers list
-  if (!matchedObserverRecord) {
-    const seedMatch = DEFAULT_AUTHORIZED_OBSERVERS.find(
-      s => s.email && s.email.trim().toLowerCase() === userEmail
-    );
-    if (seedMatch) {
-      matchedObserverRecord = seedMatch;
-    }
-  }
-
-  // 5. Evaluate result
+  // 4. Evaluate result against real Firestore records
   if (!matchedObserverRecord) {
     await signOut(auth);
     throw new Error(
@@ -196,12 +94,19 @@ export async function authenticateAndAuthorizeUser(fUser: FirebaseUser): Promise
   }
 
   // 6. Bind imported record to this user's Google UID in `users/{fUser.uid}`
+  const userRole = matchedObserverRecord.role || 'observer';
+  const defaultDisplayName = userRole === 'admin' 
+    ? 'System Administrator' 
+    : (userRole === 'field_supervisor' || userRole === 'supervisor') 
+    ? 'Field Supervisor' 
+    : 'Field Observer';
+
   const newUserProfile: User = {
     uid: fUser.uid,
-    displayName: matchedObserverRecord.displayName || fUser.displayName || 'Field Observer',
+    displayName: matchedObserverRecord.displayName || fUser.displayName || defaultDisplayName,
     email: fUser.email,
     phone: matchedObserverRecord.phone || '',
-    role: matchedObserverRecord.role || 'observer',
+    role: userRole,
     assignedPollingUnitId: matchedObserverRecord.assignedPollingUnitId || '',
     assignedPollingUnitName: matchedObserverRecord.assignedPollingUnitName || '',
     state: matchedObserverRecord.state || 'Lagos',

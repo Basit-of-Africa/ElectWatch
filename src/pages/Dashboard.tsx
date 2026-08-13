@@ -366,7 +366,7 @@ export default function Dashboard() {
         />
         <StatCard 
           title={isAdmin || isSupervisor ? "Open Cases" : "PU Status"} 
-          value={isAdmin || isSupervisor ? incidents.filter(i => i.status !== 'resolved').length : (user as any)?.assignedPollingUnitId || 'PU-882'} 
+          value={isAdmin || isSupervisor ? incidents.filter(i => i.status !== 'resolved').length : (user as any)?.assignedPollingUnitId || 'Unassigned'} 
           icon={isAdmin || isSupervisor ? Zap : MapPin} 
           color={{ bg: 'bg-amber-50', text: 'text-amber-600' }} 
         />

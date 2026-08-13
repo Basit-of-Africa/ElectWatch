@@ -62,13 +62,12 @@ export default function Layout() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Public Live Feed', href: '/', icon: Globe },
     { name: 'Incident Map', href: '/map', icon: MapIcon },
-    // Administrators and supervisors can see all reports and observers directory
+    // Administrators and field supervisors can access full reports feed and observers roster
     ...(isAdmin || isSupervisor ? [
       { name: 'Reports', href: '/reports', icon: FileText },
       { name: 'Observers', href: '/observers', icon: Users }
     ] : []),
-    // Only common observers and admins can submit reports in this model
-    ...(!isSupervisor ? [{ name: 'Report', href: '/report', icon: FilePlus }] : []),
+    { name: 'Report', href: '/report', icon: FilePlus },
     { name: 'Incidents', href: '/incidents', icon: AlertTriangle },
   ];
 
@@ -83,8 +82,14 @@ export default function Layout() {
 
   const getRoleLabel = () => {
     if (isAdmin) return 'Administrator';
-    if (isSupervisor) return 'Supervisor';
+    if (isSupervisor) return 'Field Supervisor';
     return 'Field Observer';
+  };
+
+  const getRoleBadgeClasses = () => {
+    if (isAdmin) return 'bg-purple-100 text-purple-800 border-purple-200';
+    if (isSupervisor) return 'bg-blue-100 text-blue-800 border-blue-200';
+    return 'bg-emerald-100/70 text-emerald-800 border-emerald-200';
   };
 
   return (
@@ -126,7 +131,7 @@ export default function Layout() {
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Account</p>
               <p className="text-sm font-medium text-gray-900 mt-1 truncate">{user?.displayName}</p>
-              <p className="text-xs text-emerald-600 font-medium bg-emerald-100/50 px-2 py-0.5 rounded-full inline-block mt-1 uppercase tracking-tighter">
+              <p className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-block mt-1 uppercase tracking-wider border ${getRoleBadgeClasses()}`}>
                 {getRoleLabel()}
               </p>
             </div>
