@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, query, orderBy, onSnapshot, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Incident, Report, User } from '../types';
+import { Incident, Report } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { logAuditEvent } from '../lib/audit';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
@@ -29,7 +29,10 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
-  Trash2
+  Trash2,
+  Lock,
+  EyeOff,
+  Shield
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,7 +52,6 @@ export default function IncidentDetail() {
   const { isAdmin, isSupervisor } = useAuth();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [report, setReport] = useState<Report | null>(null);
-  const [observer, setObserver] = useState<User | null>(null);
   const [history, setHistory] = useState<IncidentHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
@@ -101,12 +103,6 @@ export default function IncidentDetail() {
         if (reportSnap.exists()) {
           const reportData = { id: reportSnap.id, ...reportSnap.data() } as Report;
           setReport(reportData);
-
-          // Fetch observer details
-          const observerSnap = await getDoc(doc(db, 'users', reportData.observerId));
-          if (observerSnap.exists()) {
-            setObserver(observerSnap.data() as User);
-          }
         }
 
         setLoading(false);
@@ -512,36 +508,46 @@ export default function IncidentDetail() {
             </motion.div>
           )}
 
-          {/* Observer Profile */}
+          {/* Observer Profile (PII Protected) */}
           <motion.div 
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             className="bg-white rounded-[32px] border border-gray-100 shadow-sm p-8"
           >
             <h3 className="font-bold text-sm uppercase tracking-widest text-gray-400 mb-6 flex items-center gap-2">
-              <UserIcon className="w-4 h-4" /> Reporting Observer
+              <Shield className="w-4 h-4 text-emerald-600" /> Observer Verification
             </h3>
-            {observer ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 font-bold">
-                    {observer.displayName[0]}
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900">{observer.displayName}</p>
-                    <p className="text-xs text-gray-500">{observer.email}</p>
-                  </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-900 text-emerald-400 rounded-2xl flex items-center justify-center font-bold border border-slate-800 shadow-sm">
+                  <EyeOff className="w-5 h-5" />
                 </div>
-                <div className="pt-4 border-t border-gray-50 space-y-2">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Verified Credentials</p>
-                  <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-full w-fit">
-                    <CheckCircle2 className="w-3 h-3" /> Field Agent
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-gray-900">
+                      {report?.observerId ? `Field Monitor #OBS-${report.observerId.substring(0, 6).toUpperCase()}` : 'Accredited Field Agent'}
+                    </p>
                   </div>
+                  <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
+                    <Lock className="w-3 h-3 text-emerald-600" /> Identity Protected
+                  </p>
                 </div>
               </div>
-            ) : (
-              <p className="text-gray-400 text-sm italic">Observer information unavailable</p>
-            )}
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Personal identifying information (PII) is securely redacted to protect field observer physical safety and integrity during sensitive incident reporting.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-gray-50 space-y-2">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Verification Status</p>
+                <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full w-fit">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Verified On-Site Monitor
+                </div>
+              </div>
+            </div>
           </motion.div>
 
           {/* Update History */}

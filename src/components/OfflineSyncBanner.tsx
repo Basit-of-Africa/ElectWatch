@@ -13,10 +13,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 import { 
   getPendingReports, 
   syncPendingReports, 
   removePendingReport, 
+  clearAllPendingReports,
   PendingReport, 
   getLastSyncTime 
 } from '../lib/offlineStorage';
@@ -88,16 +90,25 @@ export default function OfflineSyncBanner() {
       setLastSync(getLastSyncTime());
       refreshPendingList();
 
-      if (res.successCount > 0) {
-        setSyncResult(`Successfully uploaded ${res.successCount} offline report${res.successCount > 1 ? 's' : ''}!`);
+      if (res.error) {
+        toast.error(res.error);
+        setSyncResult(res.error);
+      } else if (res.successCount > 0) {
+        const msg = `Successfully uploaded ${res.successCount} offline report${res.successCount > 1 ? 's' : ''}!`;
+        setSyncResult(msg);
+        toast.success(msg);
         setTimeout(() => setSyncResult(null), 5000);
       } else if (res.failedCount > 0) {
-        setSyncResult(`Attempted sync, but ${res.failedCount} report(s) encountered network/permission errors.`);
+        const msg = `Attempted sync, but ${res.failedCount} report(s) encountered network/permission errors.`;
+        setSyncResult(msg);
+        toast.error(msg);
         setTimeout(() => setSyncResult(null), 6000);
       }
     } catch (err: any) {
       console.error('Offline sync error', err);
-      setSyncResult('Sync failed. Will retry automatically when connection stabilizes.');
+      const msg = 'Sync failed. Will retry automatically when connection stabilizes.';
+      setSyncResult(msg);
+      toast.error(msg);
     } finally {
       setIsSyncing(false);
     }
@@ -106,6 +117,14 @@ export default function OfflineSyncBanner() {
   const handleDeleteDraft = (clientId: string) => {
     removePendingReport(clientId);
     refreshPendingList();
+    toast.info('Draft removed from local cache');
+  };
+
+  const handleClearAllDrafts = () => {
+    clearAllPendingReports();
+    refreshPendingList();
+    setShowDrawer(false);
+    toast.info('All offline drafts cleared');
   };
 
   // Only show if offline OR if there are pending reports locally
@@ -178,12 +197,20 @@ export default function OfflineSyncBanner() {
           >
             <div className="max-w-7xl mx-auto space-y-2">
               <div className="flex justify-between items-center text-xs text-slate-400 mb-1">
-                <span>Cached Incident Submissions Queue</span>
-                {lastSync && (
-                  <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Last Sync Attempt: {new Date(lastSync).toLocaleTimeString()}
-                  </span>
-                )}
+                <span className="font-semibold text-slate-300">Cached Incident Submissions Queue</span>
+                <div className="flex items-center gap-3">
+                  {lastSync && (
+                    <span className="text-[11px] text-slate-500 flex items-center gap-1 hidden sm:flex">
+                      <Clock className="w-3 h-3" /> Last Sync: {new Date(lastSync).toLocaleTimeString()}
+                    </span>
+                  )}
+                  <button
+                    onClick={handleClearAllDrafts}
+                    className="text-[11px] text-red-400 hover:text-red-300 transition-colors underline cursor-pointer"
+                  >
+                    Clear All Cached
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-2 max-h-48 overflow-y-auto pr-1">

@@ -1,5 +1,5 @@
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { Report, Incident, ReportType, Severity } from '../types';
 import { requestBackgroundReportSync } from '../serviceWorkerRegistration';
 
@@ -96,10 +96,13 @@ export const updatePendingReportStatus = (
 export const clearPendingReports = () => {
   try {
     localStorage.removeItem(PENDING_REPORTS_KEY);
+    window.dispatchEvent(new Event('ivote_pending_reports_updated'));
   } catch (err) {
     console.error('Failed to clear pending reports', err);
   }
 };
+
+export const clearAllPendingReports = clearPendingReports;
 
 export const cacheFetchedReports = (reports: Report[]) => {
   try {
@@ -144,44 +147,40 @@ export const getLastSyncTime = (): string | null => {
   return localStorage.getItem(LAST_SYNC_KEY);
 };
 
-export const syncPendingReports = async (observerId?: string) => {
+export const syncPendingReports = async (overrideObserverId?: string) => {
   const pending = getPendingReports();
   if (pending.length === 0) {
     return { successCount: 0, failedCount: 0, totalCount: 0 };
   }
 
-  const reportsToSync = observerId 
-    ? pending.filter(p => p.observerId === observerId || !p.observerId)
-    : pending;
-
-  if (reportsToSync.length === 0) {
-    return { successCount: 0, failedCount: 0, totalCount: 0 };
+  // Use authenticated user UID to satisfy Firestore Security Rules (request.auth.uid == data.observerId)
+  const activeUid = overrideObserverId || auth.currentUser?.uid;
+  if (!activeUid) {
+    console.warn('Sync delayed: Firebase user is not currently authenticated.');
+    return { 
+      successCount: 0, 
+      failedCount: pending.length, 
+      totalCount: pending.length,
+      error: 'User not signed in. Please sign in to sync offline drafts.'
+    };
   }
 
   let successCount = 0;
   let failedCount = 0;
 
-  for (const item of reportsToSync) {
+  for (const item of pending) {
     updatePendingReportStatus(item.clientId, 'syncing');
     try {
+      const payloadData: Record<string, any> = { ...item.payload };
+
       const reportData = {
         pollingUnitId: item.pollingUnitId,
-        observerId: item.observerId || observerId || 'offline_observer',
+        observerId: activeUid,
         timestamp: serverTimestamp(),
         type: item.type,
         location: item.location || null,
         media: item.media || [],
-        payload: {
-          description: item.payload.description,
-          voterCount: item.payload.voterCount,
-          severity: item.payload.severity,
-          electionLevel: item.payload.electionLevel,
-          apcVotes: item.payload.apcVotes,
-          pdpVotes: item.payload.pdpVotes,
-          lpVotes: item.payload.lpVotes,
-          nnppVotes: item.payload.nnppVotes,
-          otherVotes: item.payload.otherVotes,
-        },
+        payload: payloadData,
       };
 
       const docRef = await addDoc(collection(db, 'reports'), reportData);
@@ -197,24 +196,28 @@ export const syncPendingReports = async (observerId?: string) => {
         });
 
         if (item.payload.severity === 'critical' || item.payload.severity === 'high') {
-          await addDoc(collection(db, 'notifications'), {
-            userId: 'admin',
-            title: `CRITICAL INCIDENT: ${item.pollingUnitId}`,
-            message: item.payload.description,
-            type: item.payload.severity === 'critical' ? 'error' : 'warning',
-            read: false,
-            link: `/incidents/${incidentRef.id}`,
-            timestamp: serverTimestamp(),
-          });
-          await addDoc(collection(db, 'notifications'), {
-            userId: 'supervisor',
-            title: `CRITICAL INCIDENT: ${item.pollingUnitId}`,
-            message: item.payload.description,
-            type: item.payload.severity === 'critical' ? 'error' : 'warning',
-            read: false,
-            link: `/incidents/${incidentRef.id}`,
-            timestamp: serverTimestamp(),
-          });
+          try {
+            await addDoc(collection(db, 'notifications'), {
+              userId: 'admin',
+              title: `CRITICAL INCIDENT: ${item.pollingUnitId}`,
+              message: item.payload.description,
+              type: item.payload.severity === 'critical' ? 'error' : 'warning',
+              read: false,
+              link: `/incidents/${incidentRef.id}`,
+              timestamp: serverTimestamp(),
+            });
+            await addDoc(collection(db, 'notifications'), {
+              userId: 'supervisor',
+              title: `CRITICAL INCIDENT: ${item.pollingUnitId}`,
+              message: item.payload.description,
+              type: item.payload.severity === 'critical' ? 'error' : 'warning',
+              read: false,
+              link: `/incidents/${incidentRef.id}`,
+              timestamp: serverTimestamp(),
+            });
+          } catch (notifErr) {
+            console.warn('Non-fatal notification push warning:', notifErr);
+          }
         }
       }
 
@@ -232,6 +235,6 @@ export const syncPendingReports = async (observerId?: string) => {
   return {
     successCount,
     failedCount,
-    totalCount: reportsToSync.length,
+    totalCount: pending.length,
   };
 };
