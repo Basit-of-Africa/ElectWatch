@@ -52,6 +52,8 @@ import IncidentHistory from '../components/IncidentHistory';
 import OsunCountdown from '../components/OsunCountdown';
 import DirectiveBroadcastModal from '../components/DirectiveBroadcastModal';
 import HQDirectivesFeed from '../components/HQDirectivesFeed';
+import AutoRefreshControl from '../components/AutoRefreshControl';
+import { toast } from 'sonner';
 import { 
   Radio, 
   Megaphone 
@@ -63,6 +65,11 @@ export default function Dashboard() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isExportingCSV, setIsExportingCSV] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(60);
+  const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [stats, setStats] = useState({
     total: 0,
     incidents: 0,
@@ -149,6 +156,89 @@ export default function Dashboard() {
       setIsExportingCSV(false);
     }
   };
+
+  const refreshElectionStatistics = async (isManual = false) => {
+    setIsRefreshing(true);
+    try {
+      const reportsBaseQuery = collection(db, 'reports');
+      const reportsQ = (!isAdmin && !isSupervisor && user)
+        ? query(reportsBaseQuery, where('observerId', '==', user.uid), orderBy('timestamp', 'desc'), limit(50))
+        : query(reportsBaseQuery, orderBy('timestamp', 'desc'), limit(50));
+
+      const incidentsQ = query(collection(db, 'incidents'), orderBy('timestamp', 'desc'), limit(100));
+
+      const [reportsSnap, incidentsSnap] = await Promise.all([
+        getDocs(reportsQ).catch(e => {
+          console.warn('Auto-refresh reports query error:', e);
+          return null;
+        }),
+        getDocs(incidentsQ).catch(e => {
+          console.warn('Auto-refresh incidents query error:', e);
+          return null;
+        })
+      ]);
+
+      if (reportsSnap && !reportsSnap.empty) {
+        const docs = reportsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report));
+        setReports(docs);
+        cacheFetchedReports(docs);
+
+        const counts = docs.reduce((acc, curr) => {
+          acc[curr.type] = (acc[curr.type] || 0) + 1;
+          return acc;
+        }, {} as any);
+
+        setStats(prev => ({
+          ...prev,
+          total: (isAdmin || isSupervisor) ? reportsSnap.size : docs.length,
+          incidents: counts.incident || 0,
+          accreditation: counts.accreditation || 0,
+          results: counts.result || 0
+        }));
+      }
+
+      if (incidentsSnap && !incidentsSnap.empty) {
+        const docs = incidentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Incident));
+        setIncidents(docs);
+        cacheFetchedIncidents(docs);
+      }
+
+      const now = new Date();
+      setLastRefreshedAt(now);
+      setRefreshTrigger(prev => prev + 1);
+      setSecondsRemaining(60);
+
+      if (isManual) {
+        toast.success('Election statistics updated', {
+          description: `Telemetry synchronized • Next auto-refresh in 60s`,
+          duration: 2500
+        });
+      }
+    } catch (err) {
+      console.warn('Auto-refresh failed, maintaining active buffer:', err);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 600);
+    }
+  };
+
+  // 60-Second Auto-Refresh Interval Timer
+  useEffect(() => {
+    if (!isAutoRefreshEnabled || !user) return;
+
+    const timer = setInterval(() => {
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          refreshElectionStatistics(false);
+          return 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isAutoRefreshEnabled, user, isAdmin, isSupervisor]);
 
   useEffect(() => {
     if (!user) return;
@@ -355,15 +445,43 @@ export default function Dashboard() {
             </button>
           )}
 
-          <div className="flex items-center gap-3 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm w-fit">
-             <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 font-bold rounded-xl text-sm">
-               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-               Live Sync
-             </div>
-             <p className="text-gray-400 text-[10px] font-mono px-4 uppercase tracking-widest">Active Connection</p>
-          </div>
+          {/* 60-Second Auto-Refresh Control Component */}
+          <AutoRefreshControl
+            secondsRemaining={secondsRemaining}
+            totalInterval={60}
+            isAutoRefreshEnabled={isAutoRefreshEnabled}
+            onToggleAutoRefresh={() => {
+              const nextState = !isAutoRefreshEnabled;
+              setIsAutoRefreshEnabled(nextState);
+              if (nextState) {
+                setSecondsRemaining(60);
+                toast.info('Auto-refresh resumed', { description: 'Statistics will refresh every 60 seconds.' });
+              } else {
+                toast.info('Auto-refresh paused', { description: 'Automatic 60s background sync is paused.' });
+              }
+            }}
+            onManualRefresh={() => refreshElectionStatistics(true)}
+            isRefreshing={isRefreshing}
+            lastRefreshedAt={lastRefreshedAt}
+          />
         </div>
       </div>
+
+      {/* Subtle Synchronizing Top Banner when refreshing */}
+      {isRefreshing && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-2xl flex items-center justify-between text-xs text-emerald-900 font-bold"
+        >
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span>Synchronizing live election telemetry across national polling units...</span>
+          </div>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-700">60s Auto-Cycle</span>
+        </motion.div>
+      )}
 
       {/* Osun State Gubernatorial Election Dynamic Countdown */}
       <OsunCountdown />
@@ -378,7 +496,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* Stats Grid - Tailored per role */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
         <StatCard 
           title={isAdmin || isSupervisor ? "Global Reports" : "My Reports"}
           value={stats.total} 
@@ -399,7 +517,7 @@ export default function Dashboard() {
         />
         <StatCard 
           title="System Vitality" 
-          value="Active" 
+          value={isRefreshing ? "Syncing..." : "Active"} 
           icon={Activity} 
           color={{ bg: 'bg-emerald-50', text: 'text-emerald-600' }} 
         />
@@ -411,7 +529,13 @@ export default function Dashboard() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <NationalOverview />
+        <NationalOverview 
+          lastRefreshedAt={lastRefreshedAt}
+          refreshTrigger={refreshTrigger}
+          secondsRemaining={secondsRemaining}
+          isAutoRefreshEnabled={isAutoRefreshEnabled}
+          onManualRefreshParent={() => refreshElectionStatistics(true)}
+        />
       </motion.div>
 
       {/* Incident History View - Lists all past SOS alerts triggered by observers with timestamp, location, and reporting observer */}

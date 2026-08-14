@@ -87,7 +87,21 @@ const STATUS_PIE_COLORS = [
   '#ef4444'  // Disrupted / Incident
 ];
 
-export default function NationalOverview() {
+interface NationalOverviewProps {
+  lastRefreshedAt?: Date;
+  refreshTrigger?: number;
+  onManualRefreshParent?: () => void;
+  secondsRemaining?: number;
+  isAutoRefreshEnabled?: boolean;
+}
+
+export default function NationalOverview({
+  lastRefreshedAt,
+  refreshTrigger,
+  onManualRefreshParent,
+  secondsRemaining,
+  isAutoRefreshEnabled
+}: NationalOverviewProps = {}) {
   const [reports, setReports] = useState<Report[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [observers, setObservers] = useState<User[]>([]);
@@ -98,6 +112,7 @@ export default function NationalOverview() {
   const [selectedState, setSelectedState] = useState<string>('All States (National)');
   const [activeView, setActiveView] = useState<ViewMode>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [internalLastRefreshed, setInternalLastRefreshed] = useState<Date>(new Date());
 
   // Real-time Firestore Listeners
   useEffect(() => {
@@ -157,16 +172,32 @@ export default function NationalOverview() {
     };
   }, []);
 
+  useEffect(() => {
+    if (refreshTrigger) {
+      setIsRefreshing(true);
+      setInternalLastRefreshed(new Date());
+      const timer = setTimeout(() => {
+        setIsRefreshing(false);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [refreshTrigger]);
+
   const handleManualRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 600);
+    if (onManualRefreshParent) {
+      onManualRefreshParent();
+    } else {
+      setIsRefreshing(true);
+      setInternalLastRefreshed(new Date());
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 600);
+    }
   };
 
   // Filter Firestore Data based on Time Range & Selected State
   const filteredData = useMemo(() => {
-    const now = new Date();
+    const now = lastRefreshedAt || internalLastRefreshed || new Date();
     let cutoff = new Date(0); // All time
 
     if (timeRange === '1h') cutoff = subHours(now, 1);
@@ -349,12 +380,23 @@ export default function NationalOverview() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded-xl text-xs font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>
+                {secondsRemaining !== undefined && isAutoRefreshEnabled !== false
+                  ? `Auto-Refresh in ${secondsRemaining}s`
+                  : 'Auto-Refresh (60s)'}
+              </span>
+            </div>
+
             <button
               onClick={handleManualRefresh}
-              className="px-3 py-2 bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-800 border border-gray-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+              disabled={isRefreshing}
+              className="px-3 py-2 bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-800 border border-gray-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Refresh National Statistics"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-600' : ''}`} />
-              <span>Refresh Telemetry</span>
+              <span className="hidden sm:inline">Refresh Telemetry</span>
             </button>
           </div>
         </div>
