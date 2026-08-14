@@ -35,13 +35,11 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 
 import OsunCountdown from '../components/OsunCountdown';
 
-// Dedicated display interface for the public live feed
+// Dedicated display interface for the public live feed (Zero Observer PII)
 export interface PublicDisplayReport {
   id: string;
   pollingUnitId: string;
   pollingUnitName?: string;
-  observerId?: string;
-  observerName?: string;
   type: 'accreditation' | 'incident' | 'result' | 'warning' | 'normal' | 'info';
   state?: string;
   lga?: string;
@@ -98,8 +96,6 @@ function parseFirestoreReport(doc: any): PublicDisplayReport {
     id: doc.id,
     pollingUnitId: puId,
     pollingUnitName: payload.pollingUnitName || payload.pu || puId,
-    observerId: doc.observerId ? `OBS-${doc.observerId.substring(0, 6).toUpperCase()}` : 'OBS-FIELD',
-    observerName: 'Accredited Field Observer',
     type: reportType,
     state: inferredState,
     lga: payload.lga || '',
@@ -165,15 +161,15 @@ export default function LandingPage() {
     };
   }, []);
 
-  // Filtered Reports
+  // Filtered Reports (Zero Observer PII in search)
   const filteredReports = reports.filter(r => {
     const matchesSearch =
       (r.details && r.details.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (r.pollingUnitName && r.pollingUnitName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (r.pollingUnitId && r.pollingUnitId.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (r.lga && r.lga.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (r.state && r.state.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (r.observerName && r.observerName.toLowerCase().includes(searchTerm.toLowerCase()));
+      (r.ward && r.ward.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (r.state && r.state.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesType = typeFilter === 'all' || r.type === typeFilter;
     const matchesState = stateFilter === 'all' || r.state === stateFilter;
@@ -425,24 +421,43 @@ export default function LandingPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10 flex-1 w-full">
         {/* RECENT HIGH SEVERITY ALERT TICKER (If any incident exists) */}
         {recentIncident && (
-          <div className="bg-red-950 text-white rounded-3xl p-6 border-2 border-red-600/80 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in fade-in">
+          <div className="bg-red-950 text-white rounded-3xl p-6 sm:p-7 border-2 border-red-600/80 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in fade-in">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-red-600/40 border border-red-500/50 flex items-center justify-center text-red-400 shrink-0 animate-pulse">
+              <div className="w-12 h-12 rounded-2xl bg-red-600/30 border border-red-500/50 flex items-center justify-center text-red-400 shrink-0 animate-pulse">
                 <ShieldAlert className="w-6 h-6" />
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 bg-red-600 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-md">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 bg-red-600 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-md shadow-sm">
                     URGENT INCIDENT ALERT
                   </span>
-                  <span className="text-xs text-red-200 font-mono font-bold">
-                    {recentIncident.pollingUnitId || 'PU-INCIDENT'} — {recentIncident.state}
+                  <span className="text-xs text-red-200 font-mono font-bold bg-red-900/60 px-2 py-0.5 rounded border border-red-700/50">
+                    PU: {recentIncident.pollingUnitId || 'PU-INCIDENT'}
                   </span>
+                  {recentIncident.lga && (
+                    <span className="text-xs text-red-200 font-bold bg-red-900/60 px-2 py-0.5 rounded border border-red-700/50">
+                      LGA: {recentIncident.lga}
+                    </span>
+                  )}
+                  {recentIncident.state && (
+                    <span className="text-xs text-red-300 font-semibold">
+                      • {recentIncident.state} State
+                    </span>
+                  )}
                 </div>
-                <h4 className="font-bold text-white text-base font-serif">
-                  {recentIncident.incidents || 'Field Violation Reported'}
-                </h4>
-                <p className="text-xs text-red-200 font-medium line-clamp-2 max-w-3xl">
+                
+                <div>
+                  <h4 className="font-bold text-white text-base sm:text-lg font-serif">
+                    {recentIncident.incidents || 'Field Violation / Incident Report'}
+                  </h4>
+                  {recentIncident.pollingUnitName && recentIncident.pollingUnitName !== recentIncident.pollingUnitId && (
+                    <p className="text-xs text-red-300 font-medium">
+                      Location: {recentIncident.pollingUnitName} {recentIncident.ward ? `(Ward: ${recentIncident.ward})` : ''}
+                    </p>
+                  )}
+                </div>
+
+                <p className="text-xs sm:text-sm text-red-100 font-medium line-clamp-2 max-w-3xl leading-relaxed bg-black/20 p-2.5 rounded-xl border border-red-800/40">
                   "{recentIncident.details}"
                 </p>
               </div>
@@ -450,7 +465,7 @@ export default function LandingPage() {
 
             <Link
               to={user ? "/incidents" : "/login"}
-              className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-2xl shadow transition-all shrink-0 flex items-center gap-2"
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-2xl shadow-lg shadow-red-950/40 transition-all shrink-0 flex items-center gap-2 border border-red-400"
             >
               Verify Incident Details <ChevronRight className="w-4 h-4" />
             </Link>
@@ -633,8 +648,8 @@ export default function LandingPage() {
 
                         <div className="text-gray-500 text-[11px] font-medium flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 px-2.5 py-1 rounded-full">
                           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span className="font-semibold text-slate-700">Accredited Field Observer</span>
-                          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">(Identity Protected)</span>
+                          <span className="font-semibold text-slate-700">Verified Station Transmission</span>
+                          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">(PU Record)</span>
                         </div>
                       </div>
                     </motion.div>

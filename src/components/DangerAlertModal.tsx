@@ -185,10 +185,10 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
     const puName = user.assignedPollingUnitName || 'Field Location';
     const timestampISO = new Date().toISOString();
 
-    const fullDescription = `🚨 [EMERGENCY DANGER SOS] ${currentCategoryObj.label.toUpperCase()} at ${puName} (${puId}). Observer: ${user.displayName} (${user.phone || user.email}). GPS: ${lat.toFixed(5)}°, ${lng.toFixed(5)}° (±${accuracy}m). Map: ${mapsUrl}. ${notes ? 'Details: ' + notes : 'Immediate security & emergency response required!'}`;
+    const fullDescription = `🚨 [EMERGENCY SOS: ${currentCategoryObj.label.toUpperCase()}] at ${puName} (PU: ${puId}), LGA: ${user.lga || 'Local Council'}, State: ${user.state || 'Osun'}. GPS: ${lat.toFixed(5)}°, ${lng.toFixed(5)}° (±${accuracy}m). Map: ${mapsUrl}. ${notes ? 'Incident Nature: ' + notes : 'Immediate security & emergency response required!'}`;
 
     try {
-      // 1. Save critical report with full geolocation
+      // 1. Save critical report with full geolocation (Identity protected)
       const reportRef = await addDoc(collection(db, 'reports'), {
         pollingUnitId: puId,
         observerId: user.uid,
@@ -200,10 +200,8 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
           description: fullDescription,
           severity: 'critical',
           isSos: true,
-          observerName: user.displayName,
-          observerPhone: user.phone || 'N/A',
-          state: user.state || 'Lagos',
-          lga: user.lga || 'Ikeja',
+          state: user.state || 'Osun',
+          lga: user.lga || 'Local Council',
           notes: notes,
           gpsLocation: { lat, lng, accuracy },
           mapsUrl
@@ -223,10 +221,10 @@ export default function DangerAlertModal({ isOpen, onClose }: DangerAlertModalPr
         timestamp: serverTimestamp()
       });
 
-      // 3. Dispatch high-priority notifications including GPS coordinates to Admin, Supervisors, and Observers
+      // 3. Dispatch high-priority notifications (without leaking personal credentials in summary)
       const notifData = {
         title: `🚨 EMERGENCY SOS: ${currentCategoryObj.label}`,
-        message: `${user.displayName} reported ${currentCategoryObj.label} at ${puName} (${puId}) [GPS: ${lat.toFixed(4)}°, ${lng.toFixed(4)}°]. Immediate response needed.`,
+        message: `SOS flagged for ${currentCategoryObj.label} at ${puName} (${puId}), LGA: ${user.lga || 'Local Council'} [GPS: ${lat.toFixed(4)}°, ${lng.toFixed(4)}°]. Immediate response dispatched.`,
         type: 'error',
         read: false,
         link: `/incidents/${incidentRef.id}`,
