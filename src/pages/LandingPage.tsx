@@ -186,16 +186,9 @@ export default function LandingPage() {
   const normalCount = reports.filter(r => r.type === 'normal' || r.type === 'accreditation').length;
   const infoCount = reports.filter(r => r.type === 'info').length;
 
-  // Active Observers telemetry calculation:
-  // - If signed in, uses verified account roster
-  // - For ordinary public viewers, calculates from unique transmitting observer nodes + state-wide accredited deployment contingent (3,763 Polling Units)
-  const registeredObserverCount = users.filter(u => u.role === 'observer' || u.role === 'supervisor' || !u.role).length;
-  const distinctReportingObservers = new Set(reports.map(r => r.observerKey).filter(Boolean)).size;
-  const activeObserversCount = Math.max(
-    registeredObserverCount,
-    distinctReportingObservers,
-    3763
-  );
+  // Observers onboarded in the directory
+  const onboardedObserversCount = users.filter(u => u.role === 'observer' || u.role === 'field_supervisor' || u.role === 'supervisor' || !u.role).length;
+  const activeObserversCount = onboardedObserversCount;
 
   const statesReportingCount = new Set(reports.map(r => r.state).filter(Boolean)).size || 1;
 
@@ -385,7 +378,7 @@ export default function LandingPage() {
                 </span>
               </div>
               <div className="text-2xl sm:text-3xl font-extrabold font-serif text-white tracking-tight flex items-baseline gap-2">
-                <span className="text-emerald-400 font-mono font-black">{activeObserversCount.toLocaleString()}</span>
+                <span className="text-white font-mono font-black">{onboardedObserversCount.toLocaleString()}</span>
                 <span className="text-sm font-sans font-bold text-white uppercase tracking-wider">Observers Deployed</span>
               </div>
               <p className="text-[11px] text-emerald-200/90 leading-relaxed">
