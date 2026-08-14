@@ -98,7 +98,7 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read allows live dashboard and public feed to display observer count & verification stats
       allow create: if (isOwner(userId) && isValidUser(incoming())) || isAdmin();
       allow update: if isOwner(userId) || isAdmin();
     }
