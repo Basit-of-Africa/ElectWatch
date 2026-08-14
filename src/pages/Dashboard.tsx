@@ -392,10 +392,10 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 tracking-tight font-serif">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight font-serif">
             {isAdmin ? 'Command Center' : isSupervisor ? 'Operations Hub' : 'Field Dashboard'}
           </h1>
-          <p className="text-gray-500 mt-2 text-lg font-medium">
+          <p className="text-gray-500 mt-2 text-base sm:text-lg font-medium">
             {isAdmin 
               ? 'Administrator overview of the national election process.' 
               : isSupervisor 
@@ -404,26 +404,29 @@ export default function Dashboard() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap" role="toolbar" aria-label="Dashboard actions and quick controls">
           {/* Quick Jump to Incident History */}
           <a 
             href="#incident-history" 
-            className="flex items-center gap-2 px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl shadow-xl shadow-red-600/20 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer"
+            aria-label="Jump to Incident History section"
+            className="flex items-center gap-2 px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl shadow-xl shadow-red-600/20 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer min-h-[44px]"
           >
-            <Siren className="w-4 h-4 animate-pulse text-red-100" />
+            <Siren className="w-4 h-4 animate-pulse text-red-100" aria-hidden="true" />
             <span>Incident History</span>
           </a>
 
           {/* Admin & Supervisor Declare Emergency Button */}
           {(isAdmin || isSupervisor) && (
             <button
+              type="button"
               onClick={() => {
                 setIsEmergencyBroadcast(true);
                 setShowBroadcastModal(true);
               }}
-              className="flex items-center gap-2 px-5 py-3.5 bg-red-700 hover:bg-red-600 active:bg-red-800 text-white font-black rounded-2xl shadow-xl shadow-red-700/30 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer"
+              aria-label="Declare Emergency Alert Broadcast"
+              className="flex items-center gap-2 px-5 py-3.5 bg-red-700 hover:bg-red-600 active:bg-red-800 text-white font-black rounded-2xl shadow-xl shadow-red-700/30 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer min-h-[44px]"
             >
-              <ShieldAlert className="w-4 h-4 animate-pulse text-red-200" />
+              <ShieldAlert className="w-4 h-4 animate-pulse text-red-200" aria-hidden="true" />
               <span>Declare Emergency</span>
             </button>
           )}
@@ -431,13 +434,15 @@ export default function Dashboard() {
           {/* Admin & Supervisor Broadcast Directive Button */}
           {(isAdmin || isSupervisor) && (
             <button
+              type="button"
               onClick={() => {
                 setIsEmergencyBroadcast(false);
                 setShowBroadcastModal(true);
               }}
-              className="flex items-center gap-2 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer"
+              aria-label="Broadcast Official Directive to Field Observers"
+              className="flex items-center gap-2 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer min-h-[44px]"
             >
-              <Radio className="w-4 h-4 animate-pulse text-emerald-200" />
+              <Radio className="w-4 h-4 animate-pulse text-emerald-200" aria-hidden="true" />
               <span>Broadcast Directive</span>
             </button>
           )}
@@ -446,20 +451,24 @@ export default function Dashboard() {
           {!isAdmin && !isSupervisor && (
             <Link 
               to="/report" 
-              className="flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm"
+              aria-label="Submit a new field report"
+              className="flex items-center gap-2 px-6 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm min-h-[44px]"
             >
-              <PlusCircle className="w-5 h-5" /> Submit New Report
+              <PlusCircle className="w-5 h-5" aria-hidden="true" />
+              <span>Submit New Report</span>
             </Link>
           )}
 
           {/* Admin & Supervisor CSV Export Button */}
           {(isAdmin || isSupervisor) && (
             <button
+              type="button"
               onClick={exportIncidentsCSV}
               disabled={isExportingCSV}
-              className="flex items-center gap-2 px-5 py-3.5 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-2xl shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm disabled:opacity-50 cursor-pointer"
+              aria-label="Export all incident reports as CSV"
+              className="flex items-center gap-2 px-5 py-3.5 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-2xl shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm disabled:opacity-50 cursor-pointer min-h-[44px]"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" aria-hidden="true" />
               <span>{isExportingCSV ? 'Generating CSV...' : 'Export Incidents (CSV)'}</span>
             </button>
           )}

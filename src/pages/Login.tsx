@@ -110,8 +110,8 @@ export default function Login() {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 text-red-800 text-xs font-medium rounded-2xl border border-red-200 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div role="alert" aria-live="assertive" className="mb-6 p-4 bg-red-50 text-red-800 text-xs font-medium rounded-2xl border border-red-200 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
               <div className="space-y-1">
                 <p className="font-bold text-red-900">Observer Roster Verification Failed</p>
                 <p className="leading-relaxed">{error}</p>
@@ -121,26 +121,30 @@ export default function Login() {
 
           <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-4 mb-6 text-xs text-amber-900 leading-relaxed">
             <p className="font-bold mb-1 flex items-center gap-1.5 text-amber-800">
-              <ShieldCheck className="w-4 h-4 text-amber-600" /> Authorized Personnel Requirement
+              <ShieldCheck className="w-4 h-4 text-amber-600" aria-hidden="true" /> Authorized Personnel Requirement
             </p>
             Only email addresses that have been imported into the Observer Directory (via CSV Template or Admin Registration) can log in as field observers.
           </div>
 
           <div className="space-y-4">
             <button
+              type="button"
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-4 bg-white border-2 border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/10 text-gray-700 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 disabled:opacity-50 group"
+              aria-label="Sign in with your Google account"
+              className="w-full flex items-center justify-center gap-4 bg-white border-2 border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/10 text-gray-800 font-semibold py-4 px-6 rounded-2xl transition-all duration-300 disabled:opacity-50 group min-h-[48px] cursor-pointer"
             >
-              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" />
-              {loading ? 'Verifying Authorization...' : 'Continue with Google'}
+              <img src="https://www.google.com/favicon.ico" alt="" aria-hidden="true" className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" />
+              <span>{loading ? 'Verifying Authorization...' : 'Continue with Google'}</span>
             </button>
 
             <Link
               to="/"
-              className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-3 px-6 rounded-2xl transition-all text-xs border border-gray-200"
+              aria-label="Go to the public live election feed without signing in"
+              className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-3 px-6 rounded-2xl transition-all text-xs border border-gray-200 min-h-[44px]"
             >
-              <Globe className="w-4 h-4 text-emerald-600" /> View Public Live Dashboard (No Login Required)
+              <Globe className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+              <span>View Public Live Dashboard (No Login Required)</span>
             </Link>
             
             <div className="flex items-center gap-4 text-gray-400 text-[10px] font-bold uppercase tracking-widest my-6">

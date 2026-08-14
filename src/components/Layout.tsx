@@ -48,6 +48,15 @@ export default function Layout() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Escape key listener for accessible modal / mobile menu dismiss
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+        if (showGuidelinesModal) setShowGuidelinesModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     // Track Firestore sync status
     const unsubscribeSync = onSnapshotsInSync(db, () => {
       setIsSyncing(false);
@@ -56,9 +65,10 @@ export default function Layout() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('keydown', handleKeyDown);
       unsubscribeSync();
     };
-  }, []);
+  }, [isMobileMenuOpen, showGuidelinesModal]);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -96,11 +106,22 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      {/* Accessible Skip Link for Keyboard and Screen Reader Users */}
+      <a 
+        href="#main-content" 
+        className="sr-only-focusable z-50 p-4 bg-[#141A56] text-white font-bold rounded-xl shadow-2xl fixed top-4 left-4 focus:ring-4 focus:ring-emerald-400"
+      >
+        Skip to main content
+      </a>
+
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 sticky top-0 h-screen">
+      <aside 
+        aria-label="Desktop Sidebar Navigation"
+        className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 sticky top-0 h-screen"
+      >
         <div className="p-6 flex items-center gap-3 border-b border-gray-100">
-          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
-            <Vote className="text-white w-6 h-6" />
+          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
+            <Vote className="text-white w-6 h-6" aria-hidden="true" />
           </div>
           <div>
             <h1 className="font-bold text-gray-900 leading-none">iVote</h1>
@@ -108,21 +129,22 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav aria-label="Main Navigation" className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 min-h-[44px] ${
                   isActive 
-                    ? 'bg-emerald-50 text-emerald-700 font-medium' 
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-emerald-50 text-emerald-700 font-bold shadow-sm' 
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
                 }`}
               >
-                <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : ''}`} />
-                {item.name}
+                <item.icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-emerald-600' : ''}`} aria-hidden="true" />
+                <span>{item.name}</span>
               </Link>
             );
           })}
@@ -143,28 +165,33 @@ export default function Layout() {
           </div>
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium text-sm"
+            aria-label="Sign out of your account"
+            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium text-sm min-h-[44px] cursor-pointer"
           >
-            <LogOut className="w-4 h-4" />
-            Sign Out
+            <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>
 
-      {/* Mobile Nav */}
+      {/* Mobile Nav Header */}
       <div className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
-          <Vote className="text-emerald-600 w-6 h-6" />
-          <span className="font-bold text-gray-900 tracking-tight">iVote</span>
+          <Vote className="text-emerald-600 w-6 h-6" aria-hidden="true" />
+          <span className="font-bold text-gray-900 tracking-tight text-lg">iVote</span>
         </div>
         <div className="flex items-center gap-2">
           <DangerButton variant="compact" />
           <NotificationCenter />
           <button 
+            type="button"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-navigation-drawer"
+            className="p-2.5 text-gray-700 hover:bg-gray-100 active:bg-gray-200 rounded-xl transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
-            {isMobileMenuOpen ? <X /> : <Menu />}
+            {isMobileMenuOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
           </button>
         </div>
       </div>
@@ -172,42 +199,54 @@ export default function Layout() {
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
+            id="mobile-navigation-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile Navigation Menu"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="md:hidden fixed inset-0 z-40 pt-20 bg-white"
+            className="md:hidden fixed inset-0 z-40 pt-20 bg-white overflow-y-auto"
           >
-            <nav className="p-6 space-y-2">
+            <nav aria-label="Mobile Main Navigation" className="p-6 space-y-2">
               <div className="pb-2">
-                <InstallPWAButton className="w-full justify-center py-3 text-sm" />
+                <InstallPWAButton className="w-full justify-center py-3 text-sm min-h-[44px]" />
               </div>
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-4 p-4 text-lg font-medium text-gray-900 hover:bg-gray-50 rounded-2xl"
-                >
-                  <item.icon className="w-6 h-6 text-emerald-600" />
-                  {item.name}
-                </Link>
-              ))}
+              {navigation.map((item) => {
+                const isActive = location.pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`flex items-center gap-4 p-4 text-base font-semibold rounded-2xl min-h-[48px] transition-colors ${
+                      isActive ? 'bg-emerald-50 text-emerald-800' : 'text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    <item.icon className="w-6 h-6 text-emerald-600 shrink-0" aria-hidden="true" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
               <button
+                type="button"
                 onClick={() => {
                   setIsMobileMenuOpen(false);
                   setShowGuidelinesModal(true);
                 }}
-                className="flex items-center gap-4 p-4 text-lg font-medium text-emerald-800 hover:bg-emerald-50 rounded-2xl w-full text-left cursor-pointer"
+                className="flex items-center gap-4 p-4 text-base font-semibold text-emerald-800 hover:bg-emerald-50 rounded-2xl w-full text-left cursor-pointer min-h-[48px]"
               >
-                <BookOpen className="w-6 h-6 text-emerald-600" />
-                Code of Conduct & Guidelines
+                <BookOpen className="w-6 h-6 text-emerald-600 shrink-0" aria-hidden="true" />
+                <span>Code of Conduct & Guidelines</span>
               </button>
               <button
+                type="button"
                 onClick={handleSignOut}
-                className="flex items-center gap-4 p-4 text-lg font-medium text-red-600 hover:bg-red-50 rounded-2xl w-full text-left"
+                className="flex items-center gap-4 p-4 text-base font-semibold text-red-600 hover:bg-red-50 rounded-2xl w-full text-left cursor-pointer min-h-[48px]"
               >
-                <LogOut className="w-6 h-6" />
-                Sign Out
+                <LogOut className="w-6 h-6 shrink-0" aria-hidden="true" />
+                <span>Sign Out</span>
               </button>
             </nav>
           </motion.div>
@@ -215,7 +254,7 @@ export default function Layout() {
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <main className="flex-1 min-h-screen">
+      <main id="main-content" role="main" tabIndex={-1} className="flex-1 min-h-screen outline-none">
         <header className="hidden md:flex justify-between items-center p-6 border-b border-gray-50 bg-white/50 backdrop-blur-sm sticky top-0 z-30">
           <div className="flex items-center gap-4 px-4">
              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-100 shadow-sm">

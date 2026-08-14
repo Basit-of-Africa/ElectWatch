@@ -267,13 +267,21 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#F7F5F0] text-gray-900 font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
+      {/* Accessible Skip Link */}
+      <a 
+        href="#public-live-stream-content" 
+        className="sr-only-focusable z-50 p-4 bg-[#141A56] text-white font-bold rounded-xl shadow-2xl fixed top-4 left-4 focus:ring-4 focus:ring-emerald-400"
+      >
+        Skip to live election feed
+      </a>
+
       {/* 1. TOP OFFICIAL HEADER BAR */}
-      <header className="bg-[#141A56] text-white border-b border-indigo-900/80 sticky top-0 z-50 shadow-md">
+      <header role="banner" className="bg-[#141A56] text-white border-b border-indigo-900/80 sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Brand & Crest */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-indigo-800 text-white font-black flex items-center justify-center text-xl shadow-md border border-indigo-600">
-              <ShieldCheck className="w-5 h-5 text-white" />
+              <ShieldCheck className="w-5 h-5 text-white" aria-hidden="true" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -293,8 +301,8 @@ export default function LandingPage() {
           {/* Right Action & Clock */}
           <div className="flex items-center gap-4">
             {/* Live Clock Ticker */}
-            <div className="hidden md:flex items-center gap-2 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-800/80 text-xs font-mono text-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="hidden md:flex items-center gap-2 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-800/80 text-xs font-mono text-emerald-200" aria-label="Current West Africa Time">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
               <span>{format(currentTime, 'HH:mm:ss')} WAT</span>
             </div>
 
@@ -306,39 +314,41 @@ export default function LandingPage() {
                 </span>
                 <Link
                   to="/dashboard"
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md border border-emerald-500 transition-all uppercase tracking-wider"
+                  aria-label="Go to authorized user workspace"
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md border border-emerald-500 transition-all uppercase tracking-wider min-h-[44px]"
                 >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Go to Workspace
+                  <LayoutDashboard className="w-4 h-4" aria-hidden="true" />
+                  <span>Go to Workspace</span>
                 </Link>
               </div>
             ) : (
               <Link
                 to="/login"
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-500 transition-all uppercase tracking-wider group"
+                aria-label="Sign in to observer portal"
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-500 transition-all uppercase tracking-wider group min-h-[44px]"
               >
-                <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                Sign in
+                <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
+                <span>Sign in</span>
               </Link>
             )}
           </div>
         </div>
 
         {/* Sub-bar: Public Status Banner */}
-        <div className="bg-[#10108c] px-4 py-1.5 text-xs font-medium text-blue-100 border-t border-indigo-900/80 flex items-center justify-between">
+        <div className="bg-[#10108c] px-4 py-2 text-xs font-medium text-blue-100 border-t border-indigo-900/80 flex items-center justify-between">
           <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Radio className="w-3.5 h-3.5 text-[#FC560C] animate-pulse" />
-              <span className="font-bold text-white uppercase text-[10px] tracking-widest">
+              <Radio className="w-3.5 h-3.5 text-[#FC560C] animate-pulse" aria-hidden="true" />
+              <span className="font-bold text-white uppercase text-[10px] sm:text-xs tracking-widest">
                 PUBLIC LIVE TRANSMISSION FEED — 2026 GENERAL ELECTIONS
               </span>
             </div>
             <div className="hidden sm:flex items-center gap-4 text-[11px] text-[#FC560C] font-semibold">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#FC560C] animate-ping" />
+                <span className="w-2 h-2 rounded-full bg-[#FC560C] animate-ping" aria-hidden="true" />
                 Verified Observer Telemetry
               </span>
-              <span className="text-white/30">•</span>
+              <span className="text-white/30" aria-hidden="true">•</span>
               <span>36 States + FCT Coverage</span>
             </div>
           </div>
@@ -491,15 +501,15 @@ export default function LandingPage() {
         )}
 
         {/* 2:1 COLUMN LAYOUT: LIVE FEED VS BREAKDOWN CHARTS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div id="public-live-stream-content" tabIndex={-1} className="grid grid-cols-1 lg:grid-cols-3 gap-8 outline-none">
           {/* LEFT 2 COLUMNS: LIVE REPORTS STREAM */}
-          <div className="lg:col-span-2 space-y-6">
+          <section aria-labelledby="live-stream-heading" className="lg:col-span-2 space-y-6">
             {/* Header & Filter Bar */}
             <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 font-serif flex items-center gap-2">
-                    <Radio className="w-5 h-5 text-emerald-600 animate-pulse" />
+                  <h3 id="live-stream-heading" className="text-xl font-bold text-gray-900 font-serif flex items-center gap-2">
+                    <Radio className="w-5 h-5 text-emerald-600 animate-pulse" aria-hidden="true" />
                     Live Field Observation Stream
                   </h3>
                   <p className="text-xs text-gray-500 font-medium mt-0.5">
@@ -518,46 +528,62 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 {/* Search */}
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <label htmlFor="public-stream-search" className="sr-only">
+                    Search field reports by polling unit, LGA, state, or keywords
+                  </label>
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
                   <input
+                    id="public-stream-search"
                     type="text"
                     placeholder="Search polling unit, LGA, state, or keywords..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs font-medium"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-xs font-medium min-h-[44px]"
                   />
                 </div>
 
                 {/* Type Filter */}
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="all">All Report Types</option>
-                  <option value="accreditation">Accreditations</option>
-                  <option value="incident">Incidents Only</option>
-                  <option value="info">Results / Tallies</option>
-                  <option value="normal">Field Observations</option>
-                </select>
+                <div>
+                  <label htmlFor="public-type-filter" className="sr-only">
+                    Filter by Report Type
+                  </label>
+                  <select
+                    id="public-type-filter"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="w-full sm:w-auto px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 min-h-[44px]"
+                  >
+                    <option value="all">All Report Types</option>
+                    <option value="accreditation">Accreditations</option>
+                    <option value="incident">Incidents Only</option>
+                    <option value="info">Results / Tallies</option>
+                    <option value="normal">Field Observations</option>
+                  </select>
+                </div>
 
                 {/* State Filter */}
-                <select
-                  value={stateFilter}
-                  onChange={(e) => setStateFilter(e.target.value)}
-                  className="px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                >
-                  <option value="all">All States</option>
-                  <option value="Osun">Osun</option>
-                  <option value="Edo">Edo</option>
-                  <option value="Ondo">Ondo</option>
-                  <option value="Lagos">Lagos</option>
-                  <option value="Kano">Kano</option>
-                  <option value="FCT">FCT</option>
-                  <option value="Rivers">Rivers</option>
-                  <option value="Oyo">Oyo</option>
-                  <option value="Kaduna">Kaduna</option>
-                </select>
+                <div>
+                  <label htmlFor="public-state-filter" className="sr-only">
+                    Filter by State
+                  </label>
+                  <select
+                    id="public-state-filter"
+                    value={stateFilter}
+                    onChange={(e) => setStateFilter(e.target.value)}
+                    className="w-full sm:w-auto px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 min-h-[44px]"
+                  >
+                    <option value="all">All States</option>
+                    <option value="Osun">Osun</option>
+                    <option value="Edo">Edo</option>
+                    <option value="Ondo">Ondo</option>
+                    <option value="Lagos">Lagos</option>
+                    <option value="Kano">Kano</option>
+                    <option value="FCT">FCT</option>
+                    <option value="Rivers">Rivers</option>
+                    <option value="Oyo">Oyo</option>
+                    <option value="Kaduna">Kaduna</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -675,7 +701,7 @@ export default function LandingPage() {
                 })
               )}
             </div>
-          </div>
+          </section>
 
           {/* RIGHT 1 COLUMN: BREAKDOWN CHARTS & STATS */}
           <div className="space-y-6">

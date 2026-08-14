@@ -383,12 +383,14 @@ export default function Report() {
       <AnimatePresence>
         {success && (
           <motion.div 
+            role="status"
+            aria-live="polite"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             className="p-6 bg-emerald-50 border border-emerald-100 rounded-[32px] flex items-center gap-4 text-emerald-800"
           >
-            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+            <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" aria-hidden="true" />
             <div>
               <p className="font-bold text-lg leading-tight">Report Received</p>
               <p className="text-sm opacity-80 mt-1">Your data has been successfully transmitted to the operations center.</p>
@@ -398,12 +400,14 @@ export default function Report() {
 
         {offlineNotice && (
           <motion.div 
+            role="alert"
+            aria-live="assertive"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             className="p-6 bg-amber-50 border border-amber-200 rounded-[32px] flex items-center gap-4 text-amber-900"
           >
-            <HardDrive className="w-8 h-8 text-amber-600 flex-shrink-0" />
+            <HardDrive className="w-8 h-8 text-amber-600 flex-shrink-0" aria-hidden="true" />
             <div>
               <p className="font-bold text-lg leading-tight flex items-center gap-2">
                 Saved to Offline Local Cache
@@ -414,19 +418,20 @@ export default function Report() {
         )}
       </AnimatePresence>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-8 md:p-12 space-y-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-6 sm:p-8 md:p-12 space-y-8">
         {error && (
-          <div className="p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" /> {error}
+          <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" /> 
+            <span>{error}</span>
           </div>
         )}
 
         {/* Election Level & Polling Unit Section */}
         <div className="space-y-6">
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-widest px-1">
+          <fieldset className="space-y-3">
+            <legend className="flex items-center gap-2 text-sm font-bold text-gray-900 uppercase tracking-widest px-1">
               Election Level / Category
-            </label>
+            </legend>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
                 { id: 'governorship', name: 'Gubernatorial Election', sub: 'Osun State Off-Cycle & 2027 State Governorships', badge: 'Active Default' },
@@ -438,7 +443,8 @@ export default function Report() {
                     key={lvl.id}
                     type="button"
                     onClick={() => setValue('electionLevel', lvl.id as any)}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all ${
+                    aria-pressed={isSel}
+                    className={`p-3.5 rounded-2xl border-2 text-left transition-all min-h-[48px] ${
                       isSel 
                         ? 'border-emerald-600 bg-emerald-50/60 shadow-md ring-2 ring-emerald-500/20' 
                         : 'border-gray-100 bg-gray-50/50 hover:bg-gray-100/80 hover:border-gray-200'
@@ -453,48 +459,53 @@ export default function Report() {
                 );
               })}
             </div>
-          </div>
+          </fieldset>
 
           <div className="grid md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
-                <MapPin className="w-4 h-4" /> Polling Location
+            <div className="space-y-2">
+              <label htmlFor="report-pu-id" className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-widest px-1">
+                <MapPin className="w-4 h-4 text-emerald-600" aria-hidden="true" /> Polling Location *
               </label>
               <div className="relative group">
                 <input
+                  id="report-pu-id"
                   {...register('pollingUnitId')}
+                  aria-required="true"
+                  aria-invalid={errors.pollingUnitId ? 'true' : 'false'}
+                  aria-describedby={errors.pollingUnitId ? 'pu-error' : undefined}
                   placeholder="e.g. PU-OSUN-102 (Osogbo)"
-                  className={`w-full bg-gray-50 border-2 ${errors.pollingUnitId ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-2xl py-4 px-6 text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5`}
+                  className={`w-full bg-gray-50 border-2 ${errors.pollingUnitId ? 'border-red-200 focus:border-red-500' : 'border-gray-200 focus:border-emerald-500'} rounded-2xl py-4 px-6 text-base sm:text-lg font-medium outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5 min-h-[48px]`}
                 />
-                {errors.pollingUnitId && <p className="text-red-500 text-xs font-semibold mt-2 ml-4">{errors.pollingUnitId.message}</p>}
+                {errors.pollingUnitId && <p id="pu-error" role="alert" className="text-red-500 text-xs font-semibold mt-2 ml-4">{errors.pollingUnitId.message}</p>}
               </div>
             </div>
 
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
-                <Globe className="w-4 h-4" /> Geolocation
-              </label>
+            <div className="space-y-2">
+              <span className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-widest px-1">
+                <Globe className="w-4 h-4 text-emerald-600" aria-hidden="true" /> Geolocation
+              </span>
               <button 
                 type="button"
                 onClick={handleAcquireLocation}
                 disabled={isGettingLocation}
-                className={`w-full h-[64px] rounded-2xl border-2 flex items-center justify-center gap-3 transition-all ${
+                aria-label={location ? `GPS Location attached: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "Acquire and attach GPS location"}
+                className={`w-full min-h-[56px] rounded-2xl border-2 flex items-center justify-center gap-3 transition-all font-bold text-sm ${
                   location 
                     ? 'border-emerald-500 bg-emerald-50 text-emerald-700' 
-                    : 'border-dashed border-gray-200 bg-gray-50 text-gray-500 hover:border-emerald-300 hover:bg-emerald-50/10'
+                    : 'border-dashed border-gray-200 bg-gray-50 text-gray-700 hover:border-emerald-300 hover:bg-emerald-50/10'
                 }`}
               >
                 {isGettingLocation ? (
                   <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
                 ) : location ? (
                   <>
-                    <Navigation className="w-4 h-4" />
-                    GPS Attached ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})
+                    <Navigation className="w-4 h-4" aria-hidden="true" />
+                    <span>GPS Attached ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})</span>
                   </>
                 ) : (
                   <>
-                    <MapPin className="w-4 h-4" />
-                    Attach Safe Location
+                    <MapPin className="w-4 h-4" aria-hidden="true" />
+                    <span>Attach Safe Location</span>
                   </>
                 )}
               </button>
@@ -741,17 +752,21 @@ export default function Report() {
 
         {/* Dynamic Fields Section */}
         <div className="space-y-6">
-          <div className="space-y-4">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-400 uppercase tracking-widest px-1">
-              Observation Details
+          <div className="space-y-2">
+            <label htmlFor="report-description" className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-widest px-1">
+              Observation Details *
             </label>
             <textarea
+              id="report-description"
               {...register('description')}
               rows={4}
-              placeholder="Describe what you see on the ground..."
-              className={`w-full bg-gray-50 border-2 ${errors.description ? 'border-red-200 focus:border-red-500' : 'border-gray-50 focus:border-emerald-500'} rounded-3xl py-4 px-6 text-lg outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5 resize-none`}
+              aria-required="true"
+              aria-invalid={errors.description ? "true" : "false"}
+              aria-describedby={errors.description ? "desc-error" : undefined}
+              placeholder="Describe what you see on the ground (minimum 10 characters)..."
+              className={`w-full bg-gray-50 border-2 ${errors.description ? 'border-red-200 focus:border-red-500' : 'border-gray-200 focus:border-emerald-500'} rounded-3xl py-4 px-6 text-base sm:text-lg outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5 resize-none`}
             />
-            {errors.description && <p className="text-red-500 text-xs font-semibold mt-1 ml-4">{errors.description.message}</p>}
+            {errors.description && <p id="desc-error" role="alert" className="text-red-500 text-xs font-semibold mt-1 ml-4">{errors.description.message}</p>}
           </div>
 
           <AnimatePresence mode="wait">
@@ -761,13 +776,17 @@ export default function Report() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-gray-50 rounded-3xl border border-gray-100"
+                className="space-y-4 p-6 bg-gray-50 rounded-3xl border border-gray-200"
               >
-                <label className="text-sm font-bold text-gray-600 block">Number of voters accredited so far</label>
+                <label htmlFor="voter-count-input" className="text-sm font-bold text-gray-700 block">
+                  Number of voters accredited so far
+                </label>
                 <input
+                  id="voter-count-input"
                   type="number"
+                  placeholder="0"
                   {...register('voterCount', { valueAsNumber: true })}
-                  className="w-full bg-white border border-gray-200 rounded-2xl py-3 px-6 outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full bg-white border border-gray-300 rounded-2xl py-3 px-6 outline-none focus:border-emerald-500 transition-colors font-mono text-base min-h-[48px]"
                 />
               </motion.div>
             )}
@@ -778,56 +797,61 @@ export default function Report() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-blue-50/50 rounded-3xl border border-blue-100"
+                className="space-y-4 p-6 bg-blue-50/50 rounded-3xl border border-blue-200"
               >
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-blue-950 block">Official Party Vote Tally ({watch('electionLevel')?.toUpperCase() || 'ELECTION'})</label>
+                  <h3 className="text-sm font-bold text-blue-950 block">Official Party Vote Tally ({watch('electionLevel')?.toUpperCase() || 'ELECTION'})</h3>
                   <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider bg-blue-100 px-2 py-0.5 rounded-full">Form EC8A Copy</span>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">APC Votes</label>
+                    <label htmlFor="apc-votes-input" className="text-xs font-bold text-gray-700 block mb-1">APC Votes</label>
                     <input
+                      id="apc-votes-input"
                       type="number"
                       placeholder="0"
                       {...register('apcVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">PDP Votes</label>
+                    <label htmlFor="pdp-votes-input" className="text-xs font-bold text-gray-700 block mb-1">PDP Votes</label>
                     <input
+                      id="pdp-votes-input"
                       type="number"
                       placeholder="0"
                       {...register('pdpVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">Labour Party (LP)</label>
+                    <label htmlFor="lp-votes-input" className="text-xs font-bold text-gray-700 block mb-1">Labour Party (LP)</label>
                     <input
+                      id="lp-votes-input"
                       type="number"
                       placeholder="0"
                       {...register('lpVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">NNPP Votes</label>
+                    <label htmlFor="nnpp-votes-input" className="text-xs font-bold text-gray-700 block mb-1">NNPP Votes</label>
                     <input
+                      id="nnpp-votes-input"
                       type="number"
                       placeholder="0"
                       {...register('nnppVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">Others (SDP, APGA...)</label>
+                    <label htmlFor="other-votes-input" className="text-xs font-bold text-gray-700 block mb-1">Others (SDP, APGA...)</label>
                     <input
+                      id="other-votes-input"
                       type="number"
                       placeholder="0"
                       {...register('otherVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-200 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm"
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
                     />
                   </div>
                 </div>
@@ -840,12 +864,13 @@ export default function Report() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-red-50/50 rounded-3xl border border-red-100"
+                className="space-y-4 p-6 bg-red-50/50 rounded-3xl border border-red-200"
               >
-                <label className="text-sm font-bold text-red-900 block">Severity Level</label>
+                <label htmlFor="severity-level-select" className="text-sm font-bold text-red-900 block">Severity Level</label>
                 <select 
+                  id="severity-level-select"
                   {...register('severity')}
-                  className="w-full bg-white border border-red-100 rounded-2xl py-3 px-6 outline-none focus:border-red-500 transition-colors font-medium text-red-900"
+                  className="w-full bg-white border border-red-200 rounded-2xl py-3 px-6 outline-none focus:border-red-500 transition-colors font-medium text-red-900 min-h-[48px]"
                 >
                   <option value="low">Low (Procedural issue)</option>
                   <option value="medium">Medium (Delays / Disputes)</option>
@@ -859,7 +884,8 @@ export default function Report() {
 
         <button
           disabled={isSubmitting}
-          className={`w-full py-6 px-10 rounded-[28px] font-bold text-xl flex items-center justify-center gap-4 transition-all duration-300 shadow-xl ${
+          aria-label={isSubmitting ? "Transmitting report to operations center..." : "Submit electoral field report"}
+          className={`w-full py-6 px-10 rounded-[28px] font-bold text-xl flex items-center justify-center gap-4 transition-all duration-300 shadow-xl min-h-[56px] ${
             isSubmitting 
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
               : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 active:scale-[0.98]'
