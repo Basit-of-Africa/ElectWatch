@@ -133,20 +133,29 @@ self.addEventListener('push', (event) => {
   console.log('[ServiceWorker] Push event received:', event);
 
   let data = {
-    title: '🚨 EMERGENCY DANGER SOS ALERT',
-    body: 'Urgent security incident reported by field observer.',
-    link: '/incidents',
-    tag: 'danger-sos-alert'
+    title: '🚨 EMERGENCY DECLARATION & DIRECTIVE',
+    body: 'Urgent election operational update dispatched by Headquarters.',
+    link: '/dashboard',
+    tag: 'hq-emergency-directive',
+    isEmergency: true
   };
 
   if (event.data) {
     try {
       const parsed = event.data.json();
+      const isUrgent = 
+        parsed.priority === 'critical' || 
+        parsed.priority === 'urgent' || 
+        parsed.type === 'urgent_directive' ||
+        (parsed.title && parsed.title.includes('EMERGENCY')) ||
+        (parsed.title && parsed.title.includes('🚨'));
+
       data = {
         title: parsed.title || parsed.notification?.title || data.title,
         body: parsed.body || parsed.message || parsed.notification?.body || data.body,
         link: parsed.link || parsed.data?.link || data.link,
-        tag: parsed.tag || data.tag
+        tag: parsed.tag || (isUrgent ? `emergency-${Date.now()}` : `update-${Date.now()}`),
+        isEmergency: isUrgent
       };
     } catch (err) {
       data.body = event.data.text();
@@ -157,16 +166,20 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: '/pwa-icon.svg',
     badge: '/pwa-icon.svg',
-    vibrate: [500, 150, 500, 150, 500, 150, 500],
-    tag: data.tag || 'danger-sos-alert',
+    vibrate: data.isEmergency ? [500, 200, 500, 200, 500, 200, 800] : [250, 100, 250],
+    tag: data.tag,
     renotify: true,
-    requireInteraction: true,
+    requireInteraction: data.isEmergency,
     data: {
-      url: data.link || '/incidents'
+      url: data.link || '/dashboard',
+      isEmergency: data.isEmergency
     },
-    actions: [
-      { action: 'open_sos', title: '🚨 Open Emergency SOS' },
-      { action: 'close', title: 'Dismiss' }
+    actions: data.isEmergency ? [
+      { action: 'open_directive', title: '🚨 Inspect Emergency Memo' },
+      { action: 'acknowledge', title: '✅ Acknowledge' }
+    ] : [
+      { action: 'open_directive', title: 'View Update' },
+      { action: 'dismiss', title: 'Dismiss' }
     ]
   };
 
@@ -180,15 +193,21 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[ServiceWorker] System notification clicked:', event);
   event.notification.close();
 
-  if (event.action === 'close') return;
+  if (event.action === 'dismiss') return;
 
-  const targetUrl = event.notification.data?.url || '/incidents';
+  const targetUrl = event.notification.data?.url || '/dashboard';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       // Check if window tab is already open and focus it
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
+          if (event.action === 'acknowledge') {
+            client.postMessage({
+              type: 'ACKNOWLEDGE_LATEST_DIRECTIVE',
+              timestamp: new Date().toISOString()
+            });
+          }
           client.navigate(targetUrl);
           return client.focus();
         }
@@ -200,4 +219,5 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
 

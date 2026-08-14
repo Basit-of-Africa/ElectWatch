@@ -93,8 +93,23 @@ export default function ActiveDirectivesBanner() {
       console.warn('Active directives banner listener error:', error);
     });
 
-    return () => unsubscribe();
-  }, [user, isAdmin, isSupervisor, ackIds]);
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'ACKNOWLEDGE_LATEST_DIRECTIVE' && activeDirectives.length > 0) {
+        handleAcknowledge(activeDirectives[0].id);
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+
+    return () => {
+      unsubscribe();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, [user, isAdmin, isSupervisor, ackIds, activeDirectives]);
 
   const handleAcknowledge = async (directiveId: string) => {
     saveLocalAckId(directiveId);

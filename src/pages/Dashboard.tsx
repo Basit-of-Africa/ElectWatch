@@ -53,6 +53,7 @@ import OsunCountdown from '../components/OsunCountdown';
 import DirectiveBroadcastModal from '../components/DirectiveBroadcastModal';
 import HQDirectivesFeed from '../components/HQDirectivesFeed';
 import AutoRefreshControl from '../components/AutoRefreshControl';
+import PushNotificationPrompt from '../components/PushNotificationPrompt';
 import { toast } from 'sonner';
 import { 
   Radio, 
@@ -65,6 +66,7 @@ export default function Dashboard() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isExportingCSV, setIsExportingCSV] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [isEmergencyBroadcast, setIsEmergencyBroadcast] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(60);
   const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -412,10 +414,27 @@ export default function Dashboard() {
             <span>Incident History</span>
           </a>
 
+          {/* Admin & Supervisor Declare Emergency Button */}
+          {(isAdmin || isSupervisor) && (
+            <button
+              onClick={() => {
+                setIsEmergencyBroadcast(true);
+                setShowBroadcastModal(true);
+              }}
+              className="flex items-center gap-2 px-5 py-3.5 bg-red-700 hover:bg-red-600 active:bg-red-800 text-white font-black rounded-2xl shadow-xl shadow-red-700/30 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer"
+            >
+              <ShieldAlert className="w-4 h-4 animate-pulse text-red-200" />
+              <span>Declare Emergency</span>
+            </button>
+          )}
+
           {/* Admin & Supervisor Broadcast Directive Button */}
           {(isAdmin || isSupervisor) && (
             <button
-              onClick={() => setShowBroadcastModal(true)}
+              onClick={() => {
+                setIsEmergencyBroadcast(false);
+                setShowBroadcastModal(true);
+              }}
               className="flex items-center gap-2 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/25 transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm cursor-pointer"
             >
               <Radio className="w-4 h-4 animate-pulse text-emerald-200" />
@@ -482,6 +501,9 @@ export default function Dashboard() {
           <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-700">60s Auto-Cycle</span>
         </motion.div>
       )}
+
+      {/* Web Push Notification Observer Opt-in / Status Banner */}
+      <PushNotificationPrompt />
 
       {/* Osun State Gubernatorial Election Dynamic Countdown */}
       <OsunCountdown />
@@ -1052,6 +1074,7 @@ export default function Dashboard() {
       <DirectiveBroadcastModal 
         isOpen={showBroadcastModal} 
         onClose={() => setShowBroadcastModal(false)} 
+        defaultEmergencyMode={isEmergencyBroadcast}
       />
     </div>
   );

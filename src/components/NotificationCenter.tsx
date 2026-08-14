@@ -365,22 +365,32 @@ export default function NotificationCenter() {
               </div>
 
               {/* FCM Push Notification Status Banner */}
-              <div className="px-6 py-2 bg-slate-900 text-white border-b border-slate-800 flex items-center justify-between text-xs">
+              <div className="px-6 py-2.5 bg-slate-900 text-white border-b border-slate-800 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${pushEnabled ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
                   <span className="font-bold text-[11px]">
-                    {pushEnabled ? 'Push Directives Active' : 'Push Directives Disabled'}
+                    {pushEnabled ? 'Push Directives Live' : 'Push Alerts Disabled'}
                   </span>
                 </div>
                 {!pushEnabled ? (
                   <button
                     onClick={handleEnablePush}
-                    className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-xs cursor-pointer"
+                    className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-lg transition-all shadow-xs cursor-pointer"
                   >
                     Enable Push
                   </button>
                 ) : (
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold">FCM Sync Ready</span>
+                  <button
+                    onClick={async () => {
+                      toast.info('Sending Test Emergency Push Alert...');
+                      const { sendTestWebPushNotification } = await import('../lib/fcm');
+                      await sendTestWebPushNotification();
+                    }}
+                    className="text-[10px] bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
+                    title="Send a sample emergency declaration alert to this device"
+                  >
+                    Test Alert
+                  </button>
                 )}
               </div>
 
