@@ -66,28 +66,47 @@ function parseFirestoreReport(doc: any): PublicDisplayReport {
     }
   }
 
-  const detailsText = typeof payload === 'string'
+  let detailsText = typeof payload === 'string'
     ? payload
     : (payload.description || payload.details || 'Observation reported from field.');
+
+  // If it's a result report with vote counts, append summary tally
+  if (doc.type === 'result' && (payload.apcVotes !== undefined || payload.pdpVotes !== undefined || payload.lpVotes !== undefined)) {
+    const counts: string[] = [];
+    if (payload.apcVotes !== undefined) counts.push(`APC: ${payload.apcVotes}`);
+    if (payload.pdpVotes !== undefined) counts.push(`PDP: ${payload.pdpVotes}`);
+    if (payload.lpVotes !== undefined) counts.push(`LP: ${payload.lpVotes}`);
+    if (payload.nnppVotes !== undefined) counts.push(`NNPP: ${payload.nnppVotes}`);
+    if (payload.otherVotes !== undefined) counts.push(`Others: ${payload.otherVotes}`);
+    if (counts.length > 0) {
+      detailsText = `${detailsText} [Tally: ${counts.join(' | ')}]`;
+    }
+  }
 
   let reportType: PublicDisplayReport['type'] = 'normal';
   if (doc.type === 'incident') reportType = 'incident';
   else if (doc.type === 'accreditation') reportType = 'accreditation';
   else if (doc.type === 'result') reportType = 'info';
 
+  const puId = doc.pollingUnitId || payload.pollingUnitId || 'PU-FIELD';
+  let inferredState = payload.state || doc.state || 'Osun';
+  if (puId.startsWith('OS/') || puId.toLowerCase().includes('osun')) {
+    inferredState = 'Osun';
+  }
+
   return {
     id: doc.id,
-    pollingUnitId: doc.pollingUnitId || payload.pollingUnitId || 'PU-FIELD',
-    pollingUnitName: payload.pollingUnitName || payload.pu || doc.pollingUnitId || 'Polling Unit',
+    pollingUnitId: puId,
+    pollingUnitName: payload.pollingUnitName || payload.pu || puId,
     observerId: doc.observerId ? `OBS-${doc.observerId.substring(0, 6).toUpperCase()}` : 'OBS-FIELD',
     observerName: 'Accredited Field Observer',
     type: reportType,
-    state: payload.state || 'National',
+    state: inferredState,
     lga: payload.lga || '',
     ward: payload.ward || '',
     details: detailsText,
-    turnout: payload.turnout || 'Moderate',
-    security: payload.security || 'Peaceful',
+    turnout: payload.turnout || (payload.voterCount ? `${payload.voterCount} Registered` : 'Moderate'),
+    security: payload.security || (doc.type === 'incident' ? (payload.severity ? `${payload.severity.toUpperCase()} ALERT` : 'Flagged') : 'Peaceful'),
     accreditation: payload.accreditation || 'Smooth',
     materials: payload.materials || 'Complete',
     incidents: payload.incidents || (doc.type === 'incident' ? detailsText : undefined),
@@ -483,10 +502,10 @@ export default function LandingPage() {
                   className="px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <option value="all">All Report Types</option>
-                  <option value="normal">Normal Observations</option>
+                  <option value="accreditation">Accreditations</option>
                   <option value="incident">Incidents Only</option>
-                  <option value="warning">Warnings</option>
-                  <option value="info">Informational</option>
+                  <option value="info">Results / Tallies</option>
+                  <option value="normal">Field Observations</option>
                 </select>
 
                 {/* State Filter */}
@@ -496,6 +515,9 @@ export default function LandingPage() {
                   className="px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 >
                   <option value="all">All States</option>
+                  <option value="Osun">Osun</option>
+                  <option value="Edo">Edo</option>
+                  <option value="Ondo">Ondo</option>
                   <option value="Lagos">Lagos</option>
                   <option value="Kano">Kano</option>
                   <option value="FCT">FCT</option>

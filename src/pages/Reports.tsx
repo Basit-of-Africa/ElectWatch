@@ -1,21 +1,32 @@
 import { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Report } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { cacheFetchedReports, getCachedReports } from '../lib/offlineStorage';
+import { logAuditEvent } from '../lib/audit';
+import AuditTrailModal from '../components/AuditTrailModal';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import { 
   FileText, 
   Calendar, 
   MapPin, 
-  Search,
-  ChevronRight,
-  Edit2,
-  Download,
-  Table as TableIcon,
-  FileSpreadsheet,
-  Layers,
-  ChevronDown
+  Search, 
+  ChevronRight, 
+  Edit2, 
+  Download, 
+  Table as TableIcon, 
+  FileSpreadsheet, 
+  Layers, 
+  ChevronDown,
+  Trash2,
+  History,
+  Sparkles,
+  PlusCircle,
+  ShieldCheck,
+  Radio,
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -25,13 +36,19 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export default function Reports() {
-  const { isAdmin, isSupervisor } = useAuth();
+  const { user, isAdmin, isSupervisor } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Audit Trail & Deletion Modal states
+  const [isAuditTrailOpen, setIsAuditTrailOpen] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<Report | null>(null);
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const [isCreatingTest, setIsCreatingTest] = useState(false);
 
   // Close export dropdown when clicking outside
   useEffect(() => {
@@ -47,7 +64,6 @@ export default function Reports() {
   const formatCSVCell = (value: any): string => {
     if (value === null || value === undefined) return '""';
     const stringVal = String(value);
-    // Escape internal double quotes and normalize line breaks
     return `"${stringVal.replace(/"/g, '""').replace(/\r?\n|\r/g, ' ')}"`;
   };
 
@@ -62,82 +78,61 @@ export default function Reports() {
 
     const headers = [
       'Report ID',
-      'Timestamp (UTC/Local)',
-      'Report Type',
       'Polling Unit ID',
       'Observer ID',
-      'Election Scope / Level',
-      'Description / Observation Notes',
-      'Incident Severity',
-      'Voter Count / Accredited',
+      'Report Type',
+      'Timestamp',
+      'Election Level',
+      'Voter Count / Turnout',
+      'Description / Notes',
       'APC Votes',
       'PDP Votes',
       'LP Votes',
       'NNPP Votes',
       'Other Votes',
-      'Total Votes Recorded',
-      'GPS Latitude',
-      'GPS Longitude',
-      'Media Attachments Count',
-      'Media URLs'
+      'Severity',
+      'Latitude',
+      'Longitude'
     ];
 
     const rows = targetReports.map((r) => {
-      let formattedDate = 'N/A';
-      if ((r.timestamp as any)?.toDate) {
-        formattedDate = format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss');
-      } else if (r.timestamp) {
-        try {
-          formattedDate = format(new Date(r.timestamp as any), 'yyyy-MM-dd HH:mm:ss');
-        } catch {
-          formattedDate = String(r.timestamp);
-        }
-      }
-
-      const p = r.payload || {};
-      const apc = Number(p.apcVotes) || 0;
-      const pdp = Number(p.pdpVotes) || 0;
-      const lp = Number(p.lpVotes) || 0;
-      const nnpp = Number(p.nnppVotes) || 0;
-      const other = Number(p.otherVotes) || 0;
-      const totalVotesRecorded = r.type === 'result' ? (apc + pdp + lp + nnpp + other) : '';
-
-      const mediaUrls = Array.isArray(r.media) ? r.media.map(m => m.url).join(' ; ') : '';
+      const payload = r.payload || {};
+      const timestampFormatted = (r.timestamp as any)?.toDate 
+        ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss')
+        : (r.timestamp ? String(r.timestamp) : 'N/A');
 
       return [
         formatCSVCell(r.id),
-        formatCSVCell(formattedDate),
-        formatCSVCell(r.type ? r.type.toUpperCase() : 'UNKNOWN'),
-        formatCSVCell(r.pollingUnitId || ''),
-        formatCSVCell(r.observerId || ''),
-        formatCSVCell(p.electionLevel || ''),
-        formatCSVCell(p.description || ''),
-        formatCSVCell(p.severity ? String(p.severity).toUpperCase() : ''),
-        formatCSVCell(p.voterCount !== undefined ? p.voterCount : ''),
-        formatCSVCell(p.apcVotes !== undefined ? p.apcVotes : ''),
-        formatCSVCell(p.pdpVotes !== undefined ? p.pdpVotes : ''),
-        formatCSVCell(p.lpVotes !== undefined ? p.lpVotes : ''),
-        formatCSVCell(p.nnppVotes !== undefined ? p.nnppVotes : ''),
-        formatCSVCell(p.otherVotes !== undefined ? p.otherVotes : ''),
-        formatCSVCell(totalVotesRecorded),
-        formatCSVCell(r.location?.lat !== undefined ? r.location.lat : ''),
-        formatCSVCell(r.location?.lng !== undefined ? r.location.lng : ''),
-        formatCSVCell(r.media?.length || 0),
-        formatCSVCell(mediaUrls)
+        formatCSVCell(r.pollingUnitId),
+        formatCSVCell(r.observerId || 'Unassigned'),
+        formatCSVCell(r.type),
+        formatCSVCell(timestampFormatted),
+        formatCSVCell(payload.electionLevel || 'General'),
+        formatCSVCell(payload.voterCount || ''),
+        formatCSVCell(payload.description || ''),
+        formatCSVCell(payload.apcVotes || ''),
+        formatCSVCell(payload.pdpVotes || ''),
+        formatCSVCell(payload.lpVotes || ''),
+        formatCSVCell(payload.nnppVotes || ''),
+        formatCSVCell(payload.otherVotes || ''),
+        formatCSVCell(payload.severity || ''),
+        formatCSVCell(r.location?.lat || ''),
+        formatCSVCell(r.location?.lng || '')
       ].join(',');
     });
 
-    // Add UTF-8 BOM for full international/Excel compatibility
-    const csvContent = '\uFEFF' + [headers.map(formatCSVCell).join(','), ...rows].join('\r\n');
-
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    const dateStamp = format(new Date(), 'yyyyMMdd_HHmm');
-    const scopeLabel = exportAll ? 'all' : (filterType === 'all' ? 'filtered' : filterType);
     
+    const timestampStr = format(new Date(), 'yyyyMMdd_HHmm');
+    const fileName = exportAll 
+      ? `ivote_all_field_reports_${timestampStr}.csv`
+      : `ivote_filtered_reports_${filterType}_${timestampStr}.csv`;
+
     link.setAttribute('href', url);
-    link.setAttribute('download', `election_field_reports_${scopeLabel}_${dateStamp}.csv`);
+    link.setAttribute('download', fileName);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -145,38 +140,61 @@ export default function Reports() {
     URL.revokeObjectURL(url);
 
     setShowExportMenu(false);
-    toast.success(`Successfully exported ${targetReports.length} report(s) to CSV`);
+    toast.success(`Exported ${targetReports.length} reports as CSV`);
   };
 
   const exportToPDF = () => {
     if (filteredReports.length === 0) {
-      toast.error('No reports to export.');
-      setShowExportMenu(false);
+      toast.error('No reports to export in current filter.');
       return;
     }
 
-    const doc = new jsPDF();
-    doc.text('Election Field Reports', 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm:ss')} (Total: ${filteredReports.length})`, 14, 22);
+    const doc = new jsPDF({ orientation: 'landscape' });
     
-    const tableData = filteredReports.map(r => [
-      r.id.substring(0, 8),
-      r.type.toUpperCase(),
-      r.pollingUnitId,
-      (r.timestamp as any)?.toDate ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A',
-      r.payload?.description ? (r.payload.description.length > 35 ? r.payload.description.substring(0, 32) + '...' : r.payload.description) : '-'
-    ]);
+    doc.setFontSize(16);
+    doc.setTextColor(4, 120, 87);
+    doc.text('iVote Nigeria - Field Observation Reports Summary', 14, 15);
+    
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated on: ${format(new Date(), 'MMMM d, yyyy HH:mm:ss')} | Filter: ${filterType.toUpperCase()} | Total: ${filteredReports.length}`, 14, 22);
 
-    autoTable(doc, {
-      head: [['Report ID', 'Type', 'Polling Unit', 'Timestamp', 'Notes']],
-      body: tableData,
-      startY: 28,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [4, 120, 87] }
+    const tableData = filteredReports.map(r => {
+      const payload = r.payload || {};
+      const timeStr = (r.timestamp as any)?.toDate 
+        ? format((r.timestamp as any).toDate(), 'MMM d, HH:mm') 
+        : 'N/A';
+
+      let details = payload.description || '';
+      if (r.type === 'result') {
+        const votes = [];
+        if (payload.apcVotes) votes.push(`APC: ${payload.apcVotes}`);
+        if (payload.pdpVotes) votes.push(`PDP: ${payload.pdpVotes}`);
+        if (payload.lpVotes) votes.push(`LP: ${payload.lpVotes}`);
+        if (payload.nnppVotes) votes.push(`NNPP: ${payload.nnppVotes}`);
+        if (votes.length > 0) details = `${votes.join(', ')} | ${details}`;
+      }
+
+      return [
+        r.id.substring(0, 8),
+        r.pollingUnitId,
+        r.type.toUpperCase(),
+        timeStr,
+        r.observerId ? `OBS-${r.observerId.substring(0, 6)}` : 'N/A',
+        details.length > 60 ? details.substring(0, 57) + '...' : details
+      ];
     });
 
-    doc.save(`reports_export_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+    autoTable(doc, {
+      head: [['ID', 'Polling Unit', 'Type', 'Timestamp', 'Observer', 'Details / Vote Tally']],
+      body: tableData,
+      startY: 28,
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [4, 120, 87], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    doc.save(`ivote_field_reports_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
     setShowExportMenu(false);
     toast.success('Field Reports summary PDF generated');
   };
@@ -209,6 +227,151 @@ export default function Reports() {
     return () => unsubscribe();
   }, []);
 
+  // Admin deletion with Audit Trail logging
+  const handleConfirmDeleteReport = async (reason: string) => {
+    if (!isAdmin) {
+      toast.error('Unauthorized: Only administrators can delete reports.');
+      return;
+    }
+    if (!reportToDelete) return;
+
+    const reportId = reportToDelete.id;
+    const puId = reportToDelete.pollingUnitId;
+    const summary = reportToDelete.payload?.description || `${reportToDelete.type.toUpperCase()} report for PU #${puId}`;
+
+    try {
+      // 1. Log immutable audit trail entry first
+      await logAuditEvent({
+        action: 'DELETE_REPORT',
+        targetId: reportId,
+        targetType: 'report',
+        pollingUnitId: puId,
+        summary,
+        reason,
+        snapshot: reportToDelete
+      });
+
+      // 2. Delete report document
+      await deleteDoc(doc(db, 'reports', reportId));
+
+      // 3. If there is a corresponding incident record linked by reportId, delete and audit it as well
+      try {
+        const incQuery = query(collection(db, 'incidents'), where('reportId', '==', reportId));
+        const incSnapshot = await getDocs(incQuery);
+        for (const incDoc of incSnapshot.docs) {
+          await logAuditEvent({
+            action: 'DELETE_INCIDENT',
+            targetId: incDoc.id,
+            targetType: 'incident',
+            pollingUnitId: puId,
+            summary: `Cascaded deletion from Report #${reportId}`,
+            reason: `Cascade delete: ${reason}`,
+            snapshot: incDoc.data()
+          });
+          await deleteDoc(doc(db, 'incidents', incDoc.id));
+        }
+      } catch (incErr) {
+        console.warn('Incident cascade check warning:', incErr);
+      }
+
+      toast.success(`Report #${reportId.substring(0, 8)} deleted and logged to System Audit Trail.`);
+      setReportToDelete(null);
+    } catch (err: any) {
+      console.error('Failed to delete report:', err);
+      toast.error('Failed to delete report: ' + (err.message || 'Permission denied'));
+    }
+  };
+
+  // Quick Test Report Generator for User Testing & Public Feed Verification
+  const handleCreateTestReport = async (type: 'accreditation' | 'incident' | 'result') => {
+    setIsCreatingTest(true);
+    try {
+      const puNumbers = ['001', '002', '003', '004', '008', '012'];
+      const randomPU = `OS/EJ/04/${puNumbers[Math.floor(Math.random() * puNumbers.length)]}`;
+      const now = new Date();
+
+      let payload: any = {
+        electionLevel: 'governorship',
+        state: 'Osun',
+        lga: 'Ejigbo',
+        ward: 'Ward 04'
+      };
+
+      if (type === 'accreditation') {
+        payload = {
+          ...payload,
+          description: `TEST ACCREDITATION: BVAS verification functioning smoothly at PU ${randomPU}. Voter queue moving steadily with calm observer atmosphere.`,
+          voterCount: 350 + Math.floor(Math.random() * 200),
+          accreditation: 'Smooth',
+          turnout: 'High'
+        };
+      } else if (type === 'incident') {
+        const severities: ('low' | 'medium' | 'high' | 'critical')[] = ['medium', 'high', 'critical'];
+        const severity = severities[Math.floor(Math.random() * severities.length)];
+        payload = {
+          ...payload,
+          severity,
+          description: `TEST INCIDENT (${severity.toUpperCase()}): Simulated queue disruption and biometric verification delay flagged for testing public feed stream at ${randomPU}.`,
+        };
+      } else {
+        const apc = 140 + Math.floor(Math.random() * 80);
+        const pdp = 135 + Math.floor(Math.random() * 80);
+        const lp = 45 + Math.floor(Math.random() * 30);
+        const nnpp = 12 + Math.floor(Math.random() * 10);
+        payload = {
+          ...payload,
+          apcVotes: apc,
+          pdpVotes: pdp,
+          lpVotes: lp,
+          nnppVotes: nnpp,
+          otherVotes: 5,
+          voterCount: apc + pdp + lp + nnpp + 5,
+          description: `TEST RESULT: Official ballot count verified and transmitted from Polling Station ${randomPU}.`
+        };
+      }
+
+      const reportData = {
+        pollingUnitId: randomPU,
+        observerId: user?.uid || 'test_observer',
+        timestamp: serverTimestamp(),
+        type,
+        location: {
+          lat: 7.9024 + (Math.random() - 0.5) * 0.05,
+          lng: 4.3167 + (Math.random() - 0.5) * 0.05
+        },
+        payload
+      };
+
+      const docRef = await addDoc(collection(db, 'reports'), reportData);
+
+      // If it's an incident, also push to incidents collection
+      if (type === 'incident') {
+        await addDoc(collection(db, 'incidents'), {
+          reportId: docRef.id,
+          pollingUnitId: randomPU,
+          severity: payload.severity || 'medium',
+          status: 'pending',
+          description: payload.description,
+          timestamp: serverTimestamp()
+        });
+      }
+
+      setIsTestModalOpen(false);
+      toast.success(`Test ${type.toUpperCase()} Report created! It is now live on the Public Feed.`, {
+        duration: 5000,
+        action: {
+          label: 'View Public Feed',
+          onClick: () => window.location.href = '/'
+        }
+      });
+    } catch (err: any) {
+      console.error('Error creating test report:', err);
+      toast.error('Failed to create test report: ' + (err.message || 'Error'));
+    } finally {
+      setIsCreatingTest(false);
+    }
+  };
+
   const filteredReports = reports.filter(report => {
     const matchesSearch = report.pollingUnitId.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          report.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -229,6 +392,7 @@ export default function Reports() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
+      {/* Top Banner Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -241,6 +405,28 @@ export default function Reports() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+          {/* Audit Trail Button */}
+          <button
+            onClick={() => setIsAuditTrailOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl shadow-sm text-sm font-bold transition-all cursor-pointer border border-slate-700"
+            title="Open System Audit Trail to review immutable logs of all deletions and admin mutations"
+          >
+            <History className="w-4 h-4 text-emerald-400" />
+            <span>Audit Trail</span>
+          </button>
+
+          {/* Quick Test Generator Button */}
+          {isAdmin && (
+            <button
+              onClick={() => setIsTestModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl shadow-xs text-sm font-bold transition-all cursor-pointer"
+              title="Generate a test report or incident to test public live feed & deletion flow"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-600" />
+              <span>Test Report Generator</span>
+            </button>
+          )}
+
           {/* Search Input */}
           <div className="relative">
             <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -273,7 +459,7 @@ export default function Reports() {
             title="Download currently filtered reports as CSV for external spreadsheets/analysis"
           >
             <Download className="w-4 h-4" />
-            <span>Download as CSV</span>
+            <span>Download CSV</span>
             {filteredReports.length > 0 && (
               <span className="ml-0.5 px-2 py-0.5 bg-emerald-700/90 rounded-full text-xs font-mono">
                 {filteredReports.length}
@@ -423,15 +609,24 @@ export default function Reports() {
                         {isAdmin && (
                           <Link 
                             to={`/reports/${report.id}/edit`}
-                            className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                            className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-xs"
                             title="Edit Report"
                           >
                             <Edit2 className="w-4 h-4" />
                           </Link>
                         )}
+                        {isAdmin && (
+                          <button
+                            onClick={() => setReportToDelete(report)}
+                            className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-xs cursor-pointer"
+                            title="Delete Report (Admin Only - Logged to Audit Trail)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                         <Link 
                           to="/incidents"
-                          className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-900 hover:text-white transition-all shadow-sm"
+                          className="p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-900 hover:text-white transition-all shadow-xs"
                           title="View Incidents Stream"
                         >
                           <ChevronRight className="w-4 h-4" />
@@ -445,7 +640,107 @@ export default function Reports() {
           </table>
         </div>
       </div>
+
+      {/* Test Report Generator Modal */}
+      {isTestModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden"
+          >
+            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold font-serif">Generate Test Report</h3>
+                  <p className="text-xs text-slate-400">Instantly test the Public Live Feed & Deletion Flow</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTestModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Click any template below to publish a realistic test report to Firestore. It will instantly stream to the <strong>Public Live Feed</strong> on the home page. You can then test deleting it as an Admin with the audit trail.
+              </p>
+
+              <div className="space-y-2.5">
+                <button
+                  onClick={() => handleCreateTestReport('accreditation')}
+                  disabled={isCreatingTest}
+                  className="w-full p-4 rounded-2xl border border-blue-100 bg-blue-50/50 hover:bg-blue-50 text-left transition-all flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black uppercase text-blue-700 tracking-wider">Template 1</span>
+                    <h4 className="text-sm font-bold text-gray-900">Accreditation & Voter Turnout Test</h4>
+                    <p className="text-xs text-gray-500">BVAS calibration and queue verification log</p>
+                  </div>
+                  <PlusCircle className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => handleCreateTestReport('incident')}
+                  disabled={isCreatingTest}
+                  className="w-full p-4 rounded-2xl border border-red-100 bg-red-50/50 hover:bg-red-50 text-left transition-all flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black uppercase text-red-700 tracking-wider">Template 2</span>
+                    <h4 className="text-sm font-bold text-gray-900">Critical Field Incident Test</h4>
+                    <p className="text-xs text-gray-500">Flagged irregularity with real-time alert trigger</p>
+                  </div>
+                  <PlusCircle className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => handleCreateTestReport('result')}
+                  disabled={isCreatingTest}
+                  className="w-full p-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 hover:bg-emerald-50 text-left transition-all flex items-center justify-between group cursor-pointer"
+                >
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black uppercase text-emerald-700 tracking-wider">Template 3</span>
+                    <h4 className="text-sm font-bold text-gray-900">Official PU Ballot Result Test</h4>
+                    <p className="text-xs text-gray-500">Complete party vote tally transmission</p>
+                  </div>
+                  <PlusCircle className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                </button>
+              </div>
+
+              {isCreatingTest && (
+                <div className="p-3 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                  <span>Publishing test report to live database...</span>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal for Reports */}
+      <DeleteConfirmationModal
+        isOpen={!!reportToDelete}
+        onClose={() => setReportToDelete(null)}
+        onConfirm={handleConfirmDeleteReport}
+        title="Delete Field Report"
+        itemDescription={reportToDelete?.payload?.description || `Report ${reportToDelete?.id} of type ${reportToDelete?.type}`}
+        itemType="report"
+        pollingUnitId={reportToDelete?.pollingUnitId}
+      />
+
+      {/* Immutable System Audit Trail Modal */}
+      <AuditTrailModal
+        isOpen={isAuditTrailOpen}
+        onClose={() => setIsAuditTrailOpen(false)}
+      />
     </div>
   );
 }
-

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { doc, getDoc, collection, query, orderBy, onSnapshot, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { doc, getDoc, collection, query, orderBy, onSnapshot, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Incident, Report, User } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { logAuditEvent } from '../lib/audit';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import { toast } from 'sonner';
 import { 
   ArrowLeft, 
   Clock, 
@@ -25,7 +28,8 @@ import {
   Download,
   ShieldCheck,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,6 +45,7 @@ interface IncidentHistory {
 
 export default function IncidentDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { isAdmin, isSupervisor } = useAuth();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [report, setReport] = useState<Report | null>(null);
@@ -50,6 +55,32 @@ export default function IncidentDetail() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const handleConfirmDelete = async (reason: string) => {
+    if (!isAdmin || !id || !incident) return;
+    try {
+      // 1. Log immutable audit trail entry first
+      await logAuditEvent({
+        action: 'DELETE_INCIDENT',
+        targetId: id,
+        targetType: 'incident',
+        pollingUnitId: incident.pollingUnitId,
+        summary: incident.description,
+        reason,
+        snapshot: incident
+      });
+
+      // 2. Delete incident document
+      await deleteDoc(doc(db, 'incidents', id));
+
+      toast.success('Incident deleted and logged to System Audit Trail.');
+      navigate('/incidents');
+    } catch (err: any) {
+      console.error('Failed to delete incident:', err);
+      toast.error('Failed to delete incident: ' + (err.message || 'Permission denied'));
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -467,6 +498,16 @@ export default function IncidentDetail() {
                 >
                   Reset to Pending
                 </button>
+
+                <div className="pt-3 border-t border-gray-800">
+                  <button 
+                    onClick={() => setIsDeleteModalOpen(true)}
+                    className="w-full py-3.5 rounded-2xl font-bold text-xs transition-all bg-red-500/10 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Incident (Admin Audit)</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -538,6 +579,17 @@ export default function IncidentDetail() {
           </motion.div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Incident Record"
+        itemDescription={incident.description}
+        itemType="incident"
+        pollingUnitId={incident.pollingUnitId}
+      />
     </div>
   );
 }

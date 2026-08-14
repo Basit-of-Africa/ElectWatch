@@ -83,6 +83,27 @@
       },
       "required": ["id", "reportId", "pollingUnitId", "severity", "status", "description", "timestamp"]
     },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Immutable administrative audit trail tracking report and incident deletions and critical state mutations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string", "enum": ["DELETE_REPORT", "DELETE_INCIDENT", "UPDATE_REPORT", "UPDATE_INCIDENT_STATUS", "BROADCAST_DIRECTIVE"] },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["report", "incident", "directive"] },
+        "pollingUnitId": { "type": "string" },
+        "summary": { "type": "string" },
+        "reason": { "type": "string" },
+        "deletedBy": { "type": "string" },
+        "deletedByEmail": { "type": "string", "format": "email" },
+        "deletedByName": { "type": "string" },
+        "deletedByRole": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "snapshot": { "type": "object" }
+      },
+      "required": ["action", "targetId", "targetType", "deletedBy", "deletedByName", "timestamp"]
+    },
     "Notification": {
       "title": "Notification",
       "description": "A system alert, urgent directive, or administrative memo for field personnel.",
@@ -126,6 +147,10 @@
     "/notifications/{notificationId}": {
       "schema": "Notification",
       "description": "System alerts and notifications."
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Immutable administrative audit trail tracking report and incident deletions."
     }
   }
 }

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Incident } from '../types';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { cacheFetchedIncidents, getCachedIncidents } from '../lib/offlineStorage';
+import { logAuditEvent } from '../lib/audit';
+import AuditTrailModal from '../components/AuditTrailModal';
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import { 
   AlertTriangle, 
   Clock, 
@@ -17,10 +20,13 @@ import {
   Download,
   FileText,
   Table as TableIcon,
-  Camera
+  Camera,
+  Trash2,
+  History
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -32,6 +38,10 @@ export default function Incidents() {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Audit Trail & Deletion Modal states
+  const [isAuditTrailOpen, setIsAuditTrailOpen] = useState(false);
+  const [incidentToDelete, setIncidentToDelete] = useState<Incident | null>(null);
 
   const exportToCSV = () => {
     const headers = ['ID', 'Polling Unit', 'Severity', 'Status', 'Description', 'Timestamp'];
@@ -120,11 +130,45 @@ export default function Incidents() {
       await addDoc(collection(db, `incidents/${incidentId}/history`), {
         status,
         updatedBy: auth.currentUser?.uid,
-        updatedByName: auth.currentUser?.displayName,
+        updatedByName: auth.currentUser?.displayName || 'Administrator',
         timestamp: serverTimestamp(),
       });
+      toast.success(`Incident status updated to ${status}`);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `incidents/${incidentId}`);
+    }
+  };
+
+  const handleConfirmDeleteIncident = async (reason: string) => {
+    if (!isAdmin) {
+      toast.error('Unauthorized: Only administrators can delete incidents.');
+      return;
+    }
+    if (!incidentToDelete) return;
+
+    const incidentId = incidentToDelete.id;
+    const puId = incidentToDelete.pollingUnitId;
+
+    try {
+      // 1. Log immutable audit trail entry first
+      await logAuditEvent({
+        action: 'DELETE_INCIDENT',
+        targetId: incidentId,
+        targetType: 'incident',
+        pollingUnitId: puId,
+        summary: incidentToDelete.description,
+        reason,
+        snapshot: incidentToDelete
+      });
+
+      // 2. Delete incident document
+      await deleteDoc(doc(db, 'incidents', incidentId));
+
+      toast.success(`Incident #${incidentId.substring(0, 8)} deleted and logged to System Audit Trail.`);
+      setIncidentToDelete(null);
+    } catch (err: any) {
+      console.error('Failed to delete incident:', err);
+      toast.error('Failed to delete incident: ' + (err.message || 'Permission denied'));
     }
   };
 
@@ -168,12 +212,24 @@ export default function Incidents() {
         </div>
         
         <div className="flex flex-col md:flex-row xl:flex-row xl:items-center gap-4 w-full xl:w-auto">
+          {/* Audit Trail Button */}
+          {isAdmin && (
+            <button
+              onClick={() => setIsAuditTrailOpen(true)}
+              className="flex items-center gap-2 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl shadow-sm text-sm font-bold transition-all cursor-pointer border border-slate-700 shrink-0"
+              title="Open System Audit Trail"
+            >
+              <History className="w-4 h-4 text-emerald-400" />
+              <span>Audit Trail</span>
+            </button>
+          )}
+
           {/* Search Bar */}
-          <div className="relative group flex-1 md:min-w-[300px]">
+          <div className="relative group flex-1 md:min-w-[260px]">
              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-emerald-600 transition-colors" />
              <input 
                type="text" 
-               placeholder="Search incidents or polling units..." 
+               placeholder="Search incidents or PU..." 
                value={searchQuery}
                onChange={(e) => setSearchQuery(e.target.value)}
                className="w-full pl-12 pr-4 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium text-sm"
@@ -181,82 +237,82 @@ export default function Incidents() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
-          {/* Export Button */}
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
-            >
-              <Download className="w-4 h-4 text-emerald-600" />
-              Export
-            </button>
-            
-            <AnimatePresence>
-              {showExportMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+            {/* Export Button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-emerald-600" />
+                Export
+              </button>
+              
+              <AnimatePresence>
+                {showExportMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+                  >
+                    <button
+                      onClick={exportToCSV}
+                      className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <TableIcon className="w-4 h-4 text-emerald-600" />
+                      Export to CSV
+                    </button>
+                    <button
+                      onClick={exportToPDF}
+                      className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      Export to PDF
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+              {['all', 'pending', 'investigating', 'resolved'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all cursor-pointer ${
+                    statusFilter === f ? 'bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'
+                  }`}
                 >
-                  <button
-                    onClick={exportToCSV}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
-                  >
-                    <TableIcon className="w-4 h-4 text-emerald-600" />
-                    Export to CSV
-                  </button>
-                  <button
-                    onClick={exportToPDF}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-bold text-gray-700 flex items-center gap-3 transition-colors"
-                  >
-                    <FileText className="w-4 h-4 text-emerald-600" />
-                    Export to PDF
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                  {f}
+                </button>
+              ))}
+            </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
-            {['all', 'pending', 'investigating', 'resolved'].map((f) => (
-              <button
-                key={f}
-                onClick={() => setStatusFilter(f)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all ${
-                  statusFilter === f ? 'bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-
-          {/* Severity Filter */}
-          <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
-            <div className="px-3 text-[10px] font-black uppercase text-gray-400 tracking-widest border-r border-gray-100 mr-2">Severity</div>
-            {['all', 'low', 'medium', 'high', 'critical'].map((s) => (
-              <button
-                key={s}
-                onClick={() => setSeverityFilter(s)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${
-                  severityFilter === s 
-                    ? s === 'critical' ? 'bg-red-600 text-white shadow-lg' :
-                      s === 'high' ? 'bg-orange-600 text-white shadow-lg' :
-                      s === 'medium' ? 'bg-amber-500 text-white shadow-lg' :
-                      s === 'low' ? 'bg-blue-600 text-white shadow-lg' :
-                      'bg-gray-900 text-white shadow-lg'
-                    : 'text-gray-400 hover:bg-gray-50'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+            {/* Severity Filter */}
+            <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
+              <div className="px-3 text-[10px] font-black uppercase text-gray-400 tracking-widest border-r border-gray-100 mr-2">Severity</div>
+              {['all', 'low', 'medium', 'high', 'critical'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSeverityFilter(s)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                    severityFilter === s 
+                      ? s === 'critical' ? 'bg-red-600 text-white shadow-lg' :
+                        s === 'high' ? 'bg-orange-600 text-white shadow-lg' :
+                        s === 'medium' ? 'bg-amber-500 text-white shadow-lg' :
+                        s === 'low' ? 'bg-blue-600 text-white shadow-lg' :
+                        'bg-gray-900 text-white shadow-lg'
+                      : 'text-gray-400 hover:bg-gray-50'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
       <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
@@ -330,7 +386,7 @@ export default function Incidents() {
                         <button
                           onClick={() => handleStatusUpdate(incident.id, 'investigating')}
                           disabled={incident.status === 'investigating'}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             incident.status === 'investigating' 
                               ? 'bg-orange-50 text-orange-600 border border-orange-100 shadow-sm shadow-orange-500/10' 
                               : 'text-gray-500 hover:bg-orange-50 hover:text-orange-600'
@@ -341,7 +397,7 @@ export default function Incidents() {
                         <button
                           onClick={() => handleStatusUpdate(incident.id, 'resolved')}
                           disabled={incident.status === 'resolved'}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             incident.status === 'resolved' 
                               ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm shadow-emerald-500/10' 
                               : 'text-gray-500 hover:bg-emerald-50 hover:text-emerald-600'
@@ -352,7 +408,7 @@ export default function Incidents() {
                         <button
                           onClick={() => handleStatusUpdate(incident.id, 'pending')}
                           disabled={incident.status === 'pending'}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             incident.status === 'pending' 
                               ? 'bg-amber-50 text-amber-600 border border-amber-100 shadow-sm shadow-amber-500/10' 
                               : 'text-gray-500 hover:bg-amber-50 hover:text-amber-600'
@@ -365,8 +421,18 @@ export default function Incidents() {
                           to={`/incidents/${incident.id}`}
                           className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gray-50 text-emerald-700 hover:bg-emerald-50 mt-2 transition-all border border-gray-100"
                         >
-                          View Full Details <ChevronRight className="w-3 h-3" />
+                          View Details <ChevronRight className="w-3 h-3" />
                         </Link>
+
+                        {/* Admin Delete Incident Button */}
+                        <button
+                          onClick={() => setIncidentToDelete(incident)}
+                          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all border border-red-100 cursor-pointer mt-1"
+                          title="Delete Incident (Admin Only - Logged to Audit Trail)"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Delete Incident</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -376,6 +442,23 @@ export default function Incidents() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal for Incidents */}
+      <DeleteConfirmationModal
+        isOpen={!!incidentToDelete}
+        onClose={() => setIncidentToDelete(null)}
+        onConfirm={handleConfirmDeleteIncident}
+        title="Delete Incident Record"
+        itemDescription={incidentToDelete?.description || `Incident ${incidentToDelete?.id}`}
+        itemType="incident"
+        pollingUnitId={incidentToDelete?.pollingUnitId}
+      />
+
+      {/* Audit Trail Modal */}
+      <AuditTrailModal
+        isOpen={isAuditTrailOpen}
+        onClose={() => setIsAuditTrailOpen(false)}
+      />
     </div>
   );
 }

@@ -122,3 +122,19 @@ export interface Notification {
   link?: string;
   timestamp: string | Timestamp;
 }
+
+export interface AuditLogEntry {
+  id: string;
+  action: 'DELETE_REPORT' | 'DELETE_INCIDENT' | 'UPDATE_REPORT' | 'UPDATE_INCIDENT_STATUS' | 'BROADCAST_DIRECTIVE';
+  targetId: string;
+  targetType: 'report' | 'incident' | 'directive';
+  pollingUnitId?: string;
+  summary: string;
+  reason?: string;
+  deletedBy: string;
+  deletedByEmail?: string;
+  deletedByName: string;
+  deletedByRole?: string;
+  timestamp: string | Timestamp;
+  snapshot?: any;
+}
