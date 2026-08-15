@@ -12,6 +12,7 @@ import InstallPWABanner, { InstallPWAButton } from './InstallPWA';
 import ElectionScopeSelector from './ElectionScopeSelector';
 import ObserverOnboarding from './ObserverOnboarding';
 import PushNotificationPrompt from './PushNotificationPrompt';
+import ObserverFAB from './ObserverFAB';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -311,6 +312,9 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Observer Floating Quick Action Button (Speed Dial FAB) */}
+      <ObserverFAB />
 
       {/* Modal Overlay for Observer Guidelines & Onboarding */}
       <AnimatePresence>

@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 import OsunCountdown from '../components/OsunCountdown';
+import ObserverFAB from '../components/ObserverFAB';
 
 // Dedicated display interface for the public live feed (Zero Observer PII)
 export interface PublicDisplayReport {
@@ -882,6 +883,9 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Floating quick action button for observers */}
+      <ObserverFAB />
     </div>
   );
 }
