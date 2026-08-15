@@ -270,29 +270,29 @@ export default function LandingPage() {
 
       {/* 1. TOP OFFICIAL HEADER BAR */}
       <header role="banner" className="bg-[#141A56] text-white border-b border-indigo-900/80 sticky top-0 z-50 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-2.5 sm:py-0 flex items-center justify-between gap-3 sm:gap-4">
           {/* Brand & Crest */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-800 text-white font-black flex items-center justify-center text-xl shadow-md border border-indigo-600">
-              <ShieldCheck className="w-5 h-5 text-white" aria-hidden="true" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-indigo-800 text-white font-black flex items-center justify-center text-lg sm:text-xl shadow-md border border-indigo-600 shrink-0">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-white" aria-hidden="true" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold text-base sm:text-lg tracking-tight font-serif text-white leading-tight">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="font-bold text-base sm:text-lg tracking-tight font-serif text-white leading-tight truncate">
                   iVote
                 </h1>
-                <span className="hidden sm:inline-block px-2 py-0.5 bg-indigo-950/80 text-indigo-200 text-[10px] font-mono font-bold uppercase rounded-md border border-indigo-800/60">
-                  PUBLIC STREAM
+                <span className="inline-block px-1.5 sm:px-2 py-0.5 bg-indigo-950/80 text-indigo-200 text-[9px] sm:text-[10px] font-mono font-bold uppercase rounded-md border border-indigo-800/60 shrink-0">
+                  LIVE
                 </span>
               </div>
-              <p className="text-[11px] text-indigo-200/80 font-medium">
+              <p className="hidden sm:block text-[11px] text-indigo-200/80 font-medium truncate">
                 Civilian Watch & Real-Time Electoral Transmission Hub
               </p>
             </div>
           </div>
 
           {/* Right Action & Clock */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             {/* Live Clock Ticker */}
             <div className="hidden md:flex items-center gap-2 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-800/80 text-xs font-mono text-emerald-200" aria-label="Current West Africa Time">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
@@ -301,26 +301,26 @@ export default function LandingPage() {
 
             {/* Auth Button */}
             {user ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <span className="hidden lg:inline-block text-xs font-semibold text-emerald-200">
                   Logged in: <strong className="text-white">{user.displayName}</strong>
                 </span>
                 <Link
                   to="/dashboard"
                   aria-label="Go to authorized user workspace"
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md border border-emerald-500 transition-all uppercase tracking-wider min-h-[44px]"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md border border-emerald-500 transition-all uppercase tracking-wider min-h-[40px] sm:min-h-[44px]"
                 >
-                  <LayoutDashboard className="w-4 h-4" aria-hidden="true" />
-                  <span>Go to Workspace</span>
+                  <LayoutDashboard className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>Workspace</span>
                 </Link>
               </div>
             ) : (
               <Link
                 to="/login"
                 aria-label="Sign in to observer portal"
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-500 transition-all uppercase tracking-wider group min-h-[44px]"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-lg shadow-emerald-950/20 border border-emerald-500 transition-all uppercase tracking-wider group min-h-[40px] sm:min-h-[44px]"
               >
-                <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
+                <LogIn className="w-4 h-4 group-hover:translate-x-0.5 transition-transform shrink-0" aria-hidden="true" />
                 <span>Sign in</span>
               </Link>
             )}
@@ -328,17 +328,17 @@ export default function LandingPage() {
         </div>
 
         {/* Sub-bar: Public Status Banner */}
-        <div className="bg-[#10108c] px-4 py-2 text-xs font-medium text-blue-100 border-t border-indigo-900/80 flex items-center justify-between">
-          <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Radio className="w-3.5 h-3.5 text-[#FC560C] animate-pulse" aria-hidden="true" />
-              <span className="font-bold text-white uppercase text-[10px] sm:text-xs tracking-widest">
+        <div className="bg-[#10108c] px-4 py-1.5 sm:py-2 text-xs font-medium text-blue-100 border-t border-indigo-900/80">
+          <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <Radio className="w-3.5 h-3.5 text-[#FC560C] animate-pulse shrink-0" aria-hidden="true" />
+              <span className="font-bold text-white uppercase text-[9px] sm:text-xs tracking-wider sm:tracking-widest truncate">
                 PUBLIC LIVE TRANSMISSION FEED — 2026 GENERAL ELECTIONS
               </span>
             </div>
-            <div className="hidden sm:flex items-center gap-4 text-[11px] text-[#FC560C] font-semibold">
+            <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-[11px] text-[#FC560C] font-semibold shrink-0">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#FC560C] animate-ping" aria-hidden="true" />
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#FC560C] animate-ping shrink-0" aria-hidden="true" />
                 Verified Observer Telemetry
               </span>
               <span className="text-white/30" aria-hidden="true">•</span>
@@ -349,37 +349,37 @@ export default function LandingPage() {
       </header>
 
       {/* 2. HERO SECTION */}
-      <section className="bg-gradient-to-b from-[#141A56] via-[#101548] to-[#0a0c2e] text-white py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      <section className="bg-gradient-to-b from-[#141A56] via-[#101548] to-[#0a0c2e] text-white py-8 sm:py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#6272c0_1px,transparent_1px)] [background-size:16px_16px]" />
 
-        <div className="max-w-7xl mx-auto relative z-10 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="max-w-3xl space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-full text-xs font-bold uppercase tracking-widest">
-                <Activity className="w-3.5 h-3.5" /> Real-Time Electoral Audit
+        <div className="max-w-7xl mx-auto relative z-10 space-y-5 sm:space-y-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 sm:gap-6">
+            <div className="max-w-3xl space-y-2.5 sm:space-y-3">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-full text-xs font-bold uppercase tracking-widest">
+                <Activity className="w-3.5 h-3.5 shrink-0" /> Real-Time Electoral Audit
               </div>
-              <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight font-serif text-white leading-tight">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight font-serif text-white leading-tight">
                 Public Live Election Observation & Incident Stream
               </h2>
-              <p className="text-emerald-100/90 text-sm sm:text-base font-light max-w-2xl leading-relaxed">
+              <p className="text-emerald-100/90 text-xs sm:text-base font-light max-w-2xl leading-relaxed">
                 Direct, unedited observation reports transmitted from accredited field personnel across Nigeria. Access real-time voter turnout, BVAS operational status, and security metrics.
               </p>
             </div>
 
             {/* Quick Action Box */}
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-3xl border border-white/20 flex flex-col gap-3 shrink-0 sm:w-80 shadow-xl">
+            <div className="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-3xl border border-white/20 flex flex-col gap-2.5 sm:gap-3 shrink-0 w-full md:w-80 shadow-xl">
               <div className="flex items-center justify-between text-xs text-emerald-100 font-semibold">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
                   Field Deployment Status
                 </span>
                 <span className="text-emerald-400 font-mono font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
                   LIVE
                 </span>
               </div>
-              <div className="text-2xl sm:text-3xl font-extrabold font-serif text-white tracking-tight flex items-baseline gap-2">
+              <div className="text-xl sm:text-3xl font-extrabold font-serif text-white tracking-tight flex items-baseline gap-2 flex-wrap">
                 <span className="text-white font-mono font-black">{onboardedObserversCount.toLocaleString()}</span>
-                <span className="text-sm font-sans font-bold text-white uppercase tracking-wider">Observers Deployed</span>
+                <span className="text-xs sm:text-sm font-sans font-bold text-white uppercase tracking-wider">Observers Deployed</span>
               </div>
               <p className="text-[11px] text-emerald-200/90 leading-relaxed">
                 Accredited civilian monitors active across polling units nationwide in real time.
@@ -387,7 +387,7 @@ export default function LandingPage() {
               {!user && (
                 <Link
                   to="/login"
-                  className="mt-1 w-full text-center py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all border border-emerald-500 uppercase tracking-wider"
+                  className="mt-1 w-full text-center py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all border border-emerald-500 uppercase tracking-wider min-h-[40px] flex items-center justify-center"
                 >
                   Submit Report (Observer Login)
                 </Link>
@@ -396,42 +396,42 @@ export default function LandingPage() {
           </div>
 
           {/* FEATURED RACE COUNTDOWN - OSUN STATE GUBERNATORIAL ELECTION */}
-          <div className="pt-2">
+          <div className="pt-1 sm:pt-2">
             <OsunCountdown />
           </div>
 
           {/* KPI CARDS GRID */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-200">Total Reports Received</span>
-              <div className="text-3xl font-extrabold font-serif text-white mt-1">{totalReportsCount}</div>
-              <p className="text-[11px] text-emerald-300/80 mt-1 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Transmitted & Synchronized
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 pt-2 sm:pt-4">
+            <div className="bg-white/10 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl border border-white/15">
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-emerald-200 block truncate">Total Reports</span>
+              <div className="text-2xl sm:text-3xl font-extrabold font-serif text-white mt-0.5 sm:mt-1">{totalReportsCount}</div>
+              <p className="text-[10px] sm:text-[11px] text-emerald-300/80 mt-1 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" /> <span className="truncate">Synchronized</span>
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-red-200">Incidents & Warnings</span>
-              <div className="text-3xl font-extrabold font-serif text-red-300 mt-1">{incidentCount + warningCount}</div>
-              <p className="text-[11px] text-red-200/80 mt-1 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 text-red-400" /> {incidentCount} High Severity
+            <div className="bg-white/10 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl border border-white/15">
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-red-200 block truncate">Incidents / Warnings</span>
+              <div className="text-2xl sm:text-3xl font-extrabold font-serif text-red-300 mt-0.5 sm:mt-1">{incidentCount + warningCount}</div>
+              <p className="text-[10px] sm:text-[11px] text-red-200/80 mt-1 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" /> <span className="truncate">{incidentCount} High Severity</span>
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-200">Active Field Personnel</span>
-              <div className="text-3xl font-extrabold font-serif text-white mt-1">{activeObserversCount.toLocaleString()}</div>
-              <p className="text-[11px] text-emerald-300/80 mt-1 flex items-center gap-1">
-                <Users className="w-3 h-3 text-emerald-400" /> Deployed Across Field Units
+            <div className="bg-white/10 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl border border-white/15">
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-emerald-200 block truncate">Active Observers</span>
+              <div className="text-2xl sm:text-3xl font-extrabold font-serif text-white mt-0.5 sm:mt-1">{activeObserversCount.toLocaleString()}</div>
+              <p className="text-[10px] sm:text-[11px] text-emerald-300/80 mt-1 flex items-center gap-1">
+                <Users className="w-3 h-3 text-emerald-400 shrink-0" /> <span className="truncate">Field Personnel</span>
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-[#FC560C]/40 relative overflow-hidden group shadow-lg">
+            <div className="bg-white/10 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl border border-[#FC560C]/40 relative overflow-hidden group shadow-lg">
               <div className="absolute top-0 right-0 w-20 h-20 bg-[#FC560C]/15 rounded-full blur-xl pointer-events-none" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-[#FC560C]">State Coverage</span>
-              <div className="text-3xl font-extrabold font-serif text-white mt-1">{statesReportingCount}</div>
-              <p className="text-[11px] text-[#FC560C] font-bold mt-1 flex items-center gap-1">
-                <Globe className="w-3.5 h-3.5 text-[#FC560C]" /> Active Regional Hubs
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider sm:tracking-widest text-[#FC560C] block truncate">State Coverage</span>
+              <div className="text-2xl sm:text-3xl font-extrabold font-serif text-white mt-0.5 sm:mt-1">{statesReportingCount}</div>
+              <p className="text-[10px] sm:text-[11px] text-[#FC560C] font-bold mt-1 flex items-center gap-1">
+                <Globe className="w-3.5 h-3.5 text-[#FC560C] shrink-0" /> <span className="truncate">Active Hubs</span>
               </p>
             </div>
           </div>
@@ -439,15 +439,15 @@ export default function LandingPage() {
       </section>
 
       {/* 3. MAIN DASHBOARD CONTENT */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10 flex-1 w-full">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-10 flex-1 w-full">
         {/* RECENT HIGH SEVERITY ALERT TICKER (If any incident exists) */}
         {recentIncident && (
-          <div className="bg-red-950 text-white rounded-3xl p-6 sm:p-7 border-2 border-red-600/80 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in fade-in">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-red-600/30 border border-red-500/50 flex items-center justify-center text-red-400 shrink-0 animate-pulse">
-                <ShieldAlert className="w-6 h-6" />
+          <div className="bg-red-950 text-white rounded-3xl p-4 sm:p-7 border-2 border-red-600/80 shadow-2xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 sm:gap-6 animate-in fade-in">
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-red-600/30 border border-red-500/50 flex items-center justify-center text-red-400 shrink-0 animate-pulse mt-0.5 sm:mt-0">
+                <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-0.5 bg-red-600 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-md shadow-sm">
                     URGENT INCIDENT ALERT
@@ -486,9 +486,10 @@ export default function LandingPage() {
 
             <Link
               to={user ? "/incidents" : "/login"}
-              className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-2xl shadow-lg shadow-red-950/40 transition-all shrink-0 flex items-center gap-2 border border-red-400"
+              className="w-full md:w-auto px-5 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-2xl shadow-lg shadow-red-950/40 transition-all shrink-0 flex items-center justify-center gap-2 border border-red-400 min-h-[44px]"
             >
-              Verify Incident Details <ChevronRight className="w-4 h-4" />
+              <span>Verify Incident Details</span>
+              <ChevronRight className="w-4 h-4 shrink-0" />
             </Link>
           </div>
         )}
