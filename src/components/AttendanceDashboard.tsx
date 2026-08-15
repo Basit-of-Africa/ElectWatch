@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { motion } from 'motion/react';
+import ObserverDrawer from './ObserverDrawer';
 
 interface AttendanceDashboardProps {
   compact?: boolean;
@@ -292,111 +293,12 @@ export default function AttendanceDashboard({ compact = false }: AttendanceDashb
         )}
       </div>
 
-      {/* Detail Modal */}
-      {selectedObserver && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-3xl p-6 border border-gray-200 shadow-2xl space-y-5 animate-in fade-in">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Compass className="w-5 h-5 text-emerald-600" />
-                <h3 className="font-bold text-gray-900 font-serif text-base">Observer Attendance Record</h3>
-              </div>
-              <button
-                onClick={() => setSelectedObserver(null)}
-                className="text-gray-400 hover:text-gray-600 text-sm font-bold px-2"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-gray-900">{selectedObserver.displayName}</span>
-                  <span className={`px-2.5 py-1 font-bold uppercase rounded-lg text-[10px] border ${
-                    selectedObserver.role === 'admin'
-                      ? 'bg-purple-100 text-purple-800 border-purple-200'
-                      : (selectedObserver.role === 'field_supervisor' || selectedObserver.role === 'supervisor')
-                      ? 'bg-blue-100 text-blue-800 border-blue-200'
-                      : 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                  }`}>
-                    {selectedObserver.role === 'admin'
-                      ? 'Administrator'
-                      : (selectedObserver.role === 'field_supervisor' || selectedObserver.role === 'supervisor')
-                      ? 'Field Supervisor'
-                      : 'Field Observer'}
-                  </span>
-                </div>
-                <div className="text-gray-500 font-mono">{selectedObserver.email}</div>
-                {selectedObserver.phone && <div className="text-gray-600">Phone: {selectedObserver.phone}</div>}
-              </div>
-
-              <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Assigned Polling Station</div>
-                <div className="font-bold text-gray-900 text-sm font-serif">{selectedObserver.assignedPollingUnitName || 'Unassigned'}</div>
-                <div className="text-gray-600 font-mono">Code: {selectedObserver.assignedPollingUnitId || 'N/A'}</div>
-                <div className="text-gray-500">State: {selectedObserver.state} | LGA: {selectedObserver.lga}</div>
-              </div>
-
-              <div className="p-4 bg-white rounded-2xl border border-gray-200 space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Arrival & Geolocation Status</div>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-gray-700">Status:</span>
-                  <span className="font-bold uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                    {selectedObserver.checkInStatus || 'not_checked_in'}
-                  </span>
-                </div>
-
-                {selectedObserver.checkInTimestamp && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-500">Timestamp:</span>
-                    <span className="font-mono text-gray-800">
-                      {format(new Date(selectedObserver.checkInTimestamp), 'PPP p')}
-                    </span>
-                  </div>
-                )}
-
-                {selectedObserver.checkInLat && selectedObserver.checkInLng ? (
-                  <div className="pt-2 border-t border-gray-100 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500">GPS Coordinates:</span>
-                      <a
-                        href={`https://www.google.com/maps?q=${selectedObserver.checkInLat},${selectedObserver.checkInLng}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono font-bold text-emerald-600 hover:underline flex items-center gap-1"
-                      >
-                        {selectedObserver.checkInLat.toFixed(5)}, {selectedObserver.checkInLng.toFixed(5)}
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-400 italic text-[11px]">No GPS coordinates captured for this check-in.</p>
-                )}
-
-                {selectedObserver.checkInNotes && (
-                  <div className="pt-2 border-t border-gray-100 space-y-1">
-                    <span className="text-gray-500 font-bold">Field Notes:</span>
-                    <p className="text-gray-800 italic bg-gray-50 p-2.5 rounded-xl border border-gray-200">
-                      "{selectedObserver.checkInNotes}"
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-2 text-right">
-              <button
-                onClick={() => setSelectedObserver(null)}
-                className="px-5 py-2.5 bg-gray-900 text-white font-bold text-xs rounded-2xl hover:bg-gray-800 transition-all"
-              >
-                Close Record
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Observer Details Slide-Over Drawer */}
+      <ObserverDrawer
+        observer={selectedObserver}
+        isOpen={Boolean(selectedObserver)}
+        onClose={() => setSelectedObserver(null)}
+      />
     </div>
   );
 }

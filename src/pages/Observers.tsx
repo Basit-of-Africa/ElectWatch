@@ -33,7 +33,8 @@ import {
   Trash2,
   Sparkles,
   Compass,
-  Navigation
+  Navigation,
+  ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,6 +42,7 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import AttendanceDashboard from '../components/AttendanceDashboard';
+import ObserverDrawer from '../components/ObserverDrawer';
 
 interface ParsedObserverRow {
   id: string;
@@ -68,8 +70,10 @@ export default function Observers() {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [stateFilter, setStateFilter] = useState<string>('all');
   
-  // Modals state
+  // Modals & Slide-Over Drawer state
   const [selectedObserver, setSelectedObserver] = useState<User | null>(null);
+  const [drawerObserver, setDrawerObserver] = useState<User | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
@@ -355,6 +359,12 @@ export default function Observers() {
   const assignedCount = observers.filter(o => o.assignedPollingUnitId).length;
   const totalSubmissions = (Object.values(reportCountsByObserver) as number[]).reduce((a, b) => a + b, 0);
 
+  // Open Observer Details Slide-Over Drawer
+  const handleOpenDrawer = (obs: User) => {
+    setDrawerObserver(obs);
+    setIsDrawerOpen(true);
+  };
+
   // Open Edit Assignment Modal
   const handleOpenAssignModal = (obs: User) => {
     setSelectedObserver(obs);
@@ -382,6 +392,14 @@ export default function Observers() {
         assignedPollingUnitName: assignedUnitName
       } : o));
 
+      if (drawerObserver && drawerObserver.uid === selectedObserver.uid) {
+        setDrawerObserver(prev => prev ? {
+          ...prev,
+          assignedPollingUnitId: assignedUnitId,
+          assignedPollingUnitName: assignedUnitName
+        } : null);
+      }
+
       toast.success(`Updated Polling Unit assignment for ${selectedObserver.displayName}`);
       setIsAssignModalOpen(false);
     } catch (err: any) {
@@ -392,6 +410,13 @@ export default function Observers() {
         assignedPollingUnitId: assignedUnitId,
         assignedPollingUnitName: assignedUnitName
       } : o));
+      if (drawerObserver && drawerObserver.uid === selectedObserver.uid) {
+        setDrawerObserver(prev => prev ? {
+          ...prev,
+          assignedPollingUnitId: assignedUnitId,
+          assignedPollingUnitName: assignedUnitName
+        } : null);
+      }
       toast.success(`Updated Polling Unit for ${selectedObserver.displayName} (Local Sync)`);
       setIsAssignModalOpen(false);
     } finally {
@@ -405,9 +430,15 @@ export default function Observers() {
       const userRef = doc(db, 'users', obs.uid);
       await updateDoc(userRef, { status: newStatus });
       setObservers(prev => prev.map(o => o.uid === obs.uid ? { ...o, status: newStatus } : o));
+      if (drawerObserver && drawerObserver.uid === obs.uid) {
+        setDrawerObserver(prev => prev ? { ...prev, status: newStatus } : null);
+      }
       toast.success(`Observer ${obs.displayName} marked as ${newStatus.toUpperCase()}`);
     } catch (err) {
       setObservers(prev => prev.map(o => o.uid === obs.uid ? { ...o, status: newStatus } : o));
+      if (drawerObserver && drawerObserver.uid === obs.uid) {
+        setDrawerObserver(prev => prev ? { ...prev, status: newStatus } : null);
+      }
       toast.success(`Observer status updated to ${newStatus.toUpperCase()}`);
     }
   };
@@ -904,16 +935,22 @@ export default function Observers() {
                   const isSuspended = obs.status === 'suspended';
 
                   return (
-                    <tr key={obs.uid} className="hover:bg-emerald-50/20 transition-colors group">
+                    <tr 
+                      key={obs.uid} 
+                      onClick={() => handleOpenDrawer(obs)}
+                      className="hover:bg-emerald-50/40 transition-colors group cursor-pointer"
+                      title={`Click to view full dossier & activity logs for ${obs.displayName}`}
+                    >
                       {/* Name & Contact */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm shadow-sm border border-emerald-200 shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm shadow-sm border border-emerald-200 shrink-0 group-hover:scale-105 transition-transform">
                             {obs.displayName ? obs.displayName.charAt(0).toUpperCase() : 'O'}
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">
-                              {obs.displayName}
+                            <p className="font-bold text-gray-900 group-hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+                              <span>{obs.displayName}</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </p>
                             <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
                               <span className="flex items-center gap-1">
@@ -1027,9 +1064,19 @@ export default function Observers() {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            type="button"
+                            onClick={() => handleOpenDrawer(obs)}
+                            className="p-2 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
+                            title="View Contact & Activity Logs"
+                          >
+                            <Activity className="w-4 h-4 text-emerald-600" />
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => handleOpenAssignModal(obs)}
                             className="p-2 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
                             title="Assign or Edit Polling Unit"
@@ -1040,6 +1087,7 @@ export default function Observers() {
                           {/* Quick Status Toggle */}
                           {obs.status === 'suspended' ? (
                             <button
+                              type="button"
                               onClick={() => handleToggleStatus(obs, 'active')}
                               className="px-2.5 py-1 text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all"
                               title="Reactivate Observer"
@@ -1048,6 +1096,7 @@ export default function Observers() {
                             </button>
                           ) : (
                             <button
+                              type="button"
                               onClick={() => handleToggleStatus(obs, 'suspended')}
                               className="px-2.5 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-all"
                               title="Suspend Access"
@@ -1580,6 +1629,19 @@ export default function Observers() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Slide-Over Drawer: Observer Profile & Recent Activity Logs */}
+      <ObserverDrawer
+        observer={drawerObserver}
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onEditAssignment={(obs) => {
+          setIsDrawerOpen(false);
+          handleOpenAssignModal(obs);
+        }}
+        onToggleStatus={handleToggleStatus}
+        reportCount={drawerObserver ? (reportCountsByObserver[drawerObserver.uid] ?? drawerObserver.reportsCount ?? 0) : 0}
+      />
     </div>
   );
 }
