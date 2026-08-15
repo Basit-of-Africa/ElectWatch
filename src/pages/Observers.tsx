@@ -466,31 +466,75 @@ export default function Observers() {
 
   // Export to CSV
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Role', 'Status', 'Polling Unit ID', 'Polling Unit Name', 'State', 'LGA', 'Submissions'];
-    const csvContent = [
-      headers.join(','),
-      ...filteredObservers.map(o => [
-        `"${o.displayName}"`,
-        `"${o.email}"`,
-        o.role,
-        o.status || 'active',
-        `"${o.assignedPollingUnitId || 'Unassigned'}"`,
-        `"${o.assignedPollingUnitName || ''}"`,
-        `"${o.state || ''}"`,
-        `"${o.lga || ''}"`,
-        reportCountsByObserver[o.uid] || o.reportsCount || 0
-      ].join(','))
-    ].join('\n');
+    if (filteredObservers.length === 0) {
+      toast.error('No observers match the current filter to export.');
+      return;
+    }
 
+    // Helper for safe CSV escaping (RFC 4180)
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val);
+      if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return `"${str}"`;
+    };
+
+    const headers = [
+      'Observer ID',
+      'Full Name',
+      'Email Address',
+      'Phone Number',
+      'Role',
+      'Account Status',
+      'Assigned Polling Unit ID',
+      'Assigned Polling Unit Name',
+      'State',
+      'LGA',
+      'Check-In Status',
+      'Check-In Timestamp',
+      'Check-In Lat',
+      'Check-In Lng',
+      'Total Reports Submitted',
+      'Registration Date'
+    ];
+
+    const rows = filteredObservers.map(o => [
+      escapeCSV(o.uid),
+      escapeCSV(o.displayName || 'Unnamed Observer'),
+      escapeCSV(o.email || 'N/A'),
+      escapeCSV(o.phone || 'N/A'),
+      escapeCSV(o.role === 'admin' ? 'Administrator' : o.role === 'field_supervisor' ? 'Field Supervisor' : 'Field Observer'),
+      escapeCSV((o.status || 'active').toUpperCase()),
+      escapeCSV(o.assignedPollingUnitId || 'Unassigned'),
+      escapeCSV(o.assignedPollingUnitName || 'N/A'),
+      escapeCSV(o.state || 'N/A'),
+      escapeCSV(o.lga || 'N/A'),
+      escapeCSV(o.checkInStatus || 'pending'),
+      escapeCSV(o.checkInTimestamp ? format(new Date(o.checkInTimestamp), 'yyyy-MM-dd HH:mm:ss') : 'Not Checked In'),
+      escapeCSV(o.checkInLat || ''),
+      escapeCSV(o.checkInLng || ''),
+      reportCountsByObserver[o.uid] || o.reportsCount || 0,
+      escapeCSV(o.createdAt ? format(new Date(o.createdAt), 'yyyy-MM-dd HH:mm:ss') : 'N/A')
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
+
+    const filterContext = stateFilter !== 'all' ? `_${stateFilter.replace(/\s+/g, '_')}` : '';
+    const filename = `ivote_observers_directory${filterContext}_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
+
     link.setAttribute('href', url);
-    link.setAttribute('download', `observers_directory_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('Observers CSV exported successfully');
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${filteredObservers.length} observers to ${filename}`);
   };
 
   // Export to PDF
@@ -769,10 +813,20 @@ export default function Observers() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
               Showing <strong className="text-gray-900">{filteredObservers.length}</strong> of <strong className="text-gray-900">{observers.length}</strong> observers
             </span>
+
+            <button
+              type="button"
+              onClick={exportToCSV}
+              title="Download CSV file of all currently filtered observers"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-full text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Export CSV ({filteredObservers.length})</span>
+            </button>
 
             {(searchTerm || statusFilter !== 'all' || roleFilter !== 'all' || stateFilter !== 'all') && (
               <button
