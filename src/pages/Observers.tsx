@@ -66,6 +66,7 @@ export default function Observers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [stateFilter, setStateFilter] = useState<string>('all');
   
   // Modals state
   const [selectedObserver, setSelectedObserver] = useState<User | null>(null);
@@ -318,20 +319,34 @@ export default function Observers() {
     return acc;
   }, {} as Record<string, number>);
 
+  // Extract unique states from observers
+  const availableStates: string[] = Array.from(
+    new Set<string>(
+      observers
+        .map(o => o.state?.trim() || '')
+        .filter((state): state is string => state.length > 0)
+    )
+  ).sort();
+
   // Filtered observers list
   const filteredObservers = observers.filter(obs => {
-    const matchesSearch = 
-      obs.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      obs.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (obs.assignedPollingUnitId && obs.assignedPollingUnitId.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (obs.lga && obs.lga.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (obs.state && obs.state.toLowerCase().includes(searchTerm.toLowerCase()));
+    const term = searchTerm.trim().toLowerCase();
+    const matchesSearch = !term || (
+      (obs.displayName && obs.displayName.toLowerCase().includes(term)) ||
+      (obs.email && obs.email.toLowerCase().includes(term)) ||
+      (obs.phone && obs.phone.toLowerCase().includes(term)) ||
+      (obs.assignedPollingUnitId && obs.assignedPollingUnitId.toLowerCase().includes(term)) ||
+      (obs.assignedPollingUnitName && obs.assignedPollingUnitName.toLowerCase().includes(term)) ||
+      (obs.lga && obs.lga.toLowerCase().includes(term)) ||
+      (obs.state && obs.state.toLowerCase().includes(term))
+    );
     
     const matchesStatus = statusFilter === 'all' || (obs.status || 'active') === statusFilter;
     const matchesRole = roleFilter === 'all' || 
       (roleFilter === 'field_supervisor' ? (obs.role === 'field_supervisor' || obs.role === 'supervisor') : obs.role === roleFilter);
+    const matchesState = stateFilter === 'all' || (obs.state && obs.state.toLowerCase() === stateFilter.toLowerCase());
 
-    return matchesSearch && matchesStatus && matchesRole;
+    return matchesSearch && matchesStatus && matchesRole && matchesState;
   });
 
   // Calculate Metrics
@@ -649,31 +664,56 @@ export default function Observers() {
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+        <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
           {/* Search Box */}
           <div className="relative flex-1 w-full">
-            <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600" />
             <input
               type="text"
-              placeholder="Search by observer name, email, LGA, or assigned polling unit..."
+              id="observer-search-input"
+              placeholder="Search by observer name, email, phone, state, LGA, or Polling Unit (e.g. PU-LAG-014)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium transition-all"
+              className="w-full pl-12 pr-10 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-sm font-medium transition-all shadow-xs bg-gray-50/50 focus:bg-white text-gray-900 placeholder:text-gray-400"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="Clear search input"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200/60 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-2xl border border-gray-100 text-xs font-semibold text-gray-500">
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filter:</span>
+          {/* Filter Dropdowns */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+            {/* Location / State Filter */}
+            <div className="relative flex-1 sm:flex-initial">
+              <select
+                id="observer-state-filter"
+                value={stateFilter}
+                onChange={(e) => setStateFilter(e.target.value)}
+                className="w-full sm:w-auto pl-8 pr-8 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer appearance-none"
+              >
+                <option value="all">📍 All Locations (States)</option>
+                {availableStates.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </select>
+              <MapPin className="w-3.5 h-3.5 text-emerald-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
             {/* Status Select */}
             <select
+              id="observer-status-filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="flex-1 sm:flex-initial px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active On Duty</option>
@@ -683,15 +723,72 @@ export default function Observers() {
 
             {/* Role Select */}
             <select
+              id="observer-role-filter"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="flex-1 sm:flex-initial px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
             >
               <option value="all">All Roles</option>
               <option value="observer">Field Observers</option>
               <option value="field_supervisor">Field Supervisors</option>
               <option value="admin">Administrators</option>
             </select>
+          </div>
+        </div>
+
+        {/* Quick Location Pills & Active Filter Status Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">
+              Quick State:
+            </span>
+            <button
+              type="button"
+              onClick={() => setStateFilter('all')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                stateFilter === 'all'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              All
+            </button>
+            {availableStates.slice(0, 6).map((state) => (
+              <button
+                key={state}
+                type="button"
+                onClick={() => setStateFilter(state)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                  stateFilter.toLowerCase() === state.toLowerCase()
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {state}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-semibold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+              Showing <strong className="text-gray-900">{filteredObservers.length}</strong> of <strong className="text-gray-900">{observers.length}</strong> observers
+            </span>
+
+            {(searchTerm || statusFilter !== 'all' || roleFilter !== 'all' || stateFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setRoleFilter('all');
+                  setStateFilter('all');
+                }}
+                className="text-xs font-bold text-red-600 hover:text-red-700 hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                Reset Filters
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -704,10 +801,33 @@ export default function Observers() {
             <p className="font-medium text-sm">Syncing Observers Roster...</p>
           </div>
         ) : filteredObservers.length === 0 ? (
-          <div className="p-16 text-center text-gray-500 space-y-3">
-            <Users className="w-12 h-12 text-gray-300 mx-auto" />
-            <h3 className="text-lg font-bold text-gray-800 font-serif">No observers matched your search</h3>
-            <p className="text-sm text-gray-400">Try adjusting your filters or search keywords.</p>
+          <div className="p-16 text-center text-gray-500 space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-gray-100 flex items-center justify-center mx-auto text-gray-400">
+              <Search className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-800 font-serif">No observers matched your search</h3>
+              <p className="text-sm text-gray-400 mt-1 max-w-md mx-auto">
+                {searchTerm || stateFilter !== 'all' || statusFilter !== 'all' || roleFilter !== 'all'
+                  ? `No observer records found matching "${searchTerm || stateFilter || statusFilter || roleFilter}".`
+                  : 'There are currently no observers registered in the directory.'}
+              </p>
+            </div>
+            {(searchTerm || stateFilter !== 'all' || statusFilter !== 'all' || roleFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStateFilter('all');
+                  setStatusFilter('all');
+                  setRoleFilter('all');
+                }}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear Search & Filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
