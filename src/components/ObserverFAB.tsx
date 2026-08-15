@@ -53,9 +53,14 @@ export default function ObserverFAB() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Only render floating button for authenticated users (Observers, Supervisors, and Admin)
+  if (!user) {
+    return null;
+  }
+
   const isCheckedIn = user?.checkInStatus === 'checked_in' || user?.checkInStatus === 'observing';
 
-  const actions = user ? [
+  const actions = [
     {
       id: 'report',
       label: 'File Polling Report',
@@ -128,55 +133,6 @@ export default function ObserverFAB() {
         setShowHotlinesModal(true);
       }
     }
-  ] : [
-    {
-      id: 'login',
-      label: 'Observer Portal Login',
-      description: 'Sign in to file reports & check in',
-      icon: LogIn,
-      color: 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400',
-      badge: 'Observer Sign In',
-      onClick: () => {
-        setIsOpen(false);
-        navigate('/login');
-      }
-    },
-    {
-      id: 'public_incident',
-      label: 'File Urgent Incident',
-      description: 'Report threat or election irregularity',
-      icon: AlertTriangle,
-      color: 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400',
-      badge: 'Public Watch',
-      onClick: () => {
-        setIsOpen(false);
-        navigate('/login');
-      }
-    },
-    {
-      id: 'guidelines',
-      label: 'Observer Guidelines & Rules',
-      description: 'Electoral guidelines & code of conduct',
-      icon: BookOpen,
-      color: 'bg-slate-800 hover:bg-slate-700 text-white border-slate-600',
-      badge: 'Official',
-      onClick: () => {
-        setIsOpen(false);
-        setShowGuidelinesModal(true);
-      }
-    },
-    {
-      id: 'hotlines',
-      label: 'Situation Room Hotlines',
-      description: 'Emergency lines for security & INEC',
-      icon: Phone,
-      color: 'bg-indigo-700 hover:bg-indigo-600 text-white border-indigo-500',
-      badge: 'Helpline',
-      onClick: () => {
-        setIsOpen(false);
-        setShowHotlinesModal(true);
-      }
-    }
   ];
 
   return (
@@ -224,7 +180,7 @@ export default function ObserverFAB() {
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     </h3>
                     <p className="text-[10px] text-gray-400 font-medium">
-                      {user ? `Logged in: ${user.displayName || user.email}` : 'Civilian Watch & Field Toolkit'}
+                      Logged in: {user.displayName || user.email}
                     </p>
                   </div>
                 </div>
@@ -280,7 +236,7 @@ export default function ObserverFAB() {
                   Live Sync Active
                 </span>
                 <span className="font-mono text-gray-300">
-                  {user ? (isCheckedIn ? 'Status: Stationed' : 'Status: Pending Check-In') : 'Public Mode'}
+                  {isCheckedIn ? 'Status: Stationed' : 'Status: Pending Check-In'}
                 </span>
               </div>
             </motion.div>
@@ -337,7 +293,7 @@ export default function ObserverFAB() {
               {isOpen ? 'Close Actions' : 'Observer Actions'}
             </p>
             <p className="text-[9px] text-emerald-300 font-medium leading-none">
-              {user ? (isCheckedIn ? 'Field Active' : 'Quick Transmit') : 'Field Telemetry'}
+              {isCheckedIn ? 'Field Active' : 'Quick Transmit'}
             </p>
           </div>
         </button>
