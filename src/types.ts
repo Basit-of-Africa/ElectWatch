@@ -125,9 +125,9 @@ export interface Notification {
 
 export interface AuditLogEntry {
   id: string;
-  action: 'DELETE_REPORT' | 'DELETE_INCIDENT' | 'UPDATE_REPORT' | 'UPDATE_INCIDENT_STATUS' | 'BROADCAST_DIRECTIVE';
+  action: 'DELETE_REPORT' | 'DELETE_INCIDENT' | 'UPDATE_REPORT' | 'UPDATE_INCIDENT_STATUS' | 'BROADCAST_DIRECTIVE' | 'UPGRADE_USER_ROLE';
   targetId: string;
-  targetType: 'report' | 'incident' | 'directive';
+  targetType: 'report' | 'incident' | 'directive' | 'user';
   pollingUnitId?: string;
   summary: string;
   reason?: string;

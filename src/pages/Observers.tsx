@@ -34,7 +34,8 @@ import {
   Sparkles,
   Compass,
   Navigation,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,6 +44,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import AttendanceDashboard from '../components/AttendanceDashboard';
 import ObserverDrawer from '../components/ObserverDrawer';
+import RoleUpgradeModal from '../components/RoleUpgradeModal';
 
 interface ParsedObserverRow {
   id: string;
@@ -73,8 +75,10 @@ export default function Observers() {
   // Modals & Slide-Over Drawer state
   const [selectedObserver, setSelectedObserver] = useState<User | null>(null);
   const [drawerObserver, setDrawerObserver] = useState<User | null>(null);
+  const [upgradeObserver, setUpgradeObserver] = useState<User | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   // CSV Import Wizard State
@@ -363,6 +367,20 @@ export default function Observers() {
   const handleOpenDrawer = (obs: User) => {
     setDrawerObserver(obs);
     setIsDrawerOpen(true);
+  };
+
+  // Open Upgrade Access Level Modal
+  const handleOpenUpgradeModal = (obs: User) => {
+    setUpgradeObserver(obs);
+    setIsUpgradeModalOpen(true);
+  };
+
+  // Handle successful access level upgrade
+  const handleUpgradeSuccess = (updatedUser: User) => {
+    setObservers(prev => prev.map(o => o.uid === updatedUser.uid ? { ...o, role: updatedUser.role } : o));
+    if (drawerObserver && drawerObserver.uid === updatedUser.uid) {
+      setDrawerObserver(prev => prev ? { ...prev, role: updatedUser.role } : null);
+    }
   };
 
   // Open Edit Assignment Modal
@@ -971,15 +989,25 @@ export default function Observers() {
                       {/* Role & Status Badges */}
                       <td className="py-4 px-6">
                         <div className="flex flex-col items-start gap-1.5">
-                          <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md border ${
-                            obs.role === 'admin' 
-                              ? 'bg-purple-100 text-purple-700 border-purple-200'
-                              : (obs.role === 'field_supervisor' || obs.role === 'supervisor')
-                              ? 'bg-blue-100 text-blue-700 border-blue-200'
-                              : 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                          }`}>
+                          <button
+                            type="button"
+                            disabled={!isAdmin}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isAdmin) handleOpenUpgradeModal(obs);
+                            }}
+                            className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md border transition-all ${
+                              obs.role === 'admin' 
+                                ? 'bg-purple-100 text-purple-700 border-purple-200'
+                                : (obs.role === 'field_supervisor' || obs.role === 'supervisor')
+                                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                            } ${isAdmin ? 'hover:ring-2 hover:ring-indigo-400 hover:shadow-xs cursor-pointer' : 'cursor-default'}`}
+                            title={isAdmin ? 'Click to upgrade or modify access level' : undefined}
+                          >
                             {obs.role === 'admin' ? 'Administrator' : (obs.role === 'field_supervisor' || obs.role === 'supervisor') ? 'Field Supervisor' : 'Field Observer'}
-                          </span>
+                            {isAdmin && <span className="ml-1 text-[9px] opacity-70">⚙️</span>}
+                          </button>
 
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                             isCurrentActive 
@@ -1065,7 +1093,18 @@ export default function Observers() {
 
                       {/* Actions */}
                       <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenUpgradeModal(obs)}
+                              className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-xl transition-all"
+                              title="Upgrade or Modify Access Level"
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => handleOpenDrawer(obs)}
@@ -1639,8 +1678,20 @@ export default function Observers() {
           setIsDrawerOpen(false);
           handleOpenAssignModal(obs);
         }}
+        onUpgradeRole={isAdmin ? (obs) => {
+          setIsDrawerOpen(false);
+          handleOpenUpgradeModal(obs);
+        } : undefined}
         onToggleStatus={handleToggleStatus}
         reportCount={drawerObserver ? (reportCountsByObserver[drawerObserver.uid] ?? drawerObserver.reportsCount ?? 0) : 0}
+      />
+
+      {/* MODAL 4: Upgrade / Adjust User Access Level */}
+      <RoleUpgradeModal
+        user={upgradeObserver}
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onSuccess={handleUpgradeSuccess}
       />
     </div>
   );

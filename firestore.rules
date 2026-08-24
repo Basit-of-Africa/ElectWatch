@@ -66,8 +66,8 @@ service cloud.firestore {
     function isValidAuditLog(data) {
       return data.keys().hasAll(['action', 'targetId', 'targetType', 'deletedBy', 'deletedByName', 'timestamp']) &&
              data.keys().size() <= 15 &&
-             data.action in ['DELETE_REPORT', 'DELETE_INCIDENT', 'UPDATE_REPORT', 'UPDATE_INCIDENT_STATUS', 'BROADCAST_DIRECTIVE'] &&
-             data.targetType in ['report', 'incident', 'directive'] &&
+             data.action in ['DELETE_REPORT', 'DELETE_INCIDENT', 'UPDATE_REPORT', 'UPDATE_INCIDENT_STATUS', 'BROADCAST_DIRECTIVE', 'UPGRADE_USER_ROLE'] &&
+             data.targetType in ['report', 'incident', 'directive', 'user'] &&
              data.deletedByName is string && data.deletedByName.size() <= 100;
     }
 
