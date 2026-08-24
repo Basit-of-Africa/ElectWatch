@@ -2,11 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { User } from '../types';
-import { 
-  authenticateAndAuthorizeUser, 
-  loginWithEmailAndDefaultPassword, 
-  PRIMARY_ADMIN_EMAIL 
-} from '../lib/observerAuth';
+import { authenticateAndAuthorizeUser, PRIMARY_ADMIN_EMAIL } from '../lib/observerAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -17,8 +13,6 @@ interface AuthContextType {
   isFieldSupervisor: boolean;
   authError: string | null;
   clearAuthError: () => void;
-  loginWithEmail: (email: string, password?: string) => Promise<User>;
-  setAuthorizedUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,22 +33,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   const clearAuthError = () => setAuthError(null);
-
-  const setAuthorizedUser = (newUser: User | null) => {
-    setUser(newUser);
-    if (newUser) {
-      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(newUser));
-    } else {
-      localStorage.removeItem(USER_CACHE_KEY);
-    }
-  };
-
-  const loginWithEmail = async (email: string, password?: string): Promise<User> => {
-    clearAuthError();
-    const authorizedUser = await loginWithEmailAndDefaultPassword(email, password);
-    setAuthorizedUser(authorizedUser);
-    return authorizedUser;
-  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
@@ -95,22 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } else {
-        // If no Firebase Auth user, check if we have a valid fallback cached user session
-        const cached = localStorage.getItem(USER_CACHE_KEY);
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed && parsed.email) {
-              setUser(parsed);
-            } else {
-              setUser(null);
-            }
-          } catch {
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
+        setUser(null);
+        localStorage.removeItem(USER_CACHE_KEY);
       }
       setLoading(false);
     });
@@ -124,13 +88,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     firebaseUser,
     loading,
-    isAdmin: user?.role === 'admin' || firebaseUser?.email === PRIMARY_ADMIN_EMAIL || user?.email === PRIMARY_ADMIN_EMAIL,
+    isAdmin: user?.role === 'admin' || firebaseUser?.email === PRIMARY_ADMIN_EMAIL,
     isSupervisor,
     isFieldSupervisor: isSupervisor,
     authError,
     clearAuthError,
-    loginWithEmail,
-    setAuthorizedUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
