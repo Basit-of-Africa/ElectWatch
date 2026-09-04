@@ -26,6 +26,8 @@ import {
   ShieldCheck,
   Radio,
   CheckCircle2,
+  ShieldAlert,
+  Users,
   X
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -34,6 +36,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { 
+  exportIncidentReportsCSV, 
+  exportAccreditationReportsCSV, 
+  exportMasterReportsCSV,
+  ObserverInfo,
+  IncidentMeta
+} from '../lib/reportExport';
+import DownloadReportsModal from '../components/DownloadReportsModal';
 
 export default function Reports() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -50,6 +60,39 @@ export default function Reports() {
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [isCreatingTest, setIsCreatingTest] = useState(false);
 
+  // Download Reports Modal & Analytical Metadata states
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [observerMap, setObserverMap] = useState<Record<string, ObserverInfo>>({});
+  const [incidentMap, setIncidentMap] = useState<Record<string, IncidentMeta>>({});
+
+  // Real-time synchronization for observer details and incident status mappings
+  useEffect(() => {
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      const map: Record<string, ObserverInfo> = {};
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        map[d.id] = { displayName: data.displayName, email: data.email, phone: data.phone };
+      });
+      setObserverMap(map);
+    }, (err) => console.warn('Users listener notice:', err));
+
+    const unsubIncidents = onSnapshot(collection(db, 'incidents'), (snap) => {
+      const map: Record<string, IncidentMeta> = {};
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (data.reportId) {
+          map[data.reportId] = { id: d.id, status: data.status };
+        }
+      });
+      setIncidentMap(map);
+    }, (err) => console.warn('Incidents listener notice:', err));
+
+    return () => {
+      unsubUsers();
+      unsubIncidents();
+    };
+  }, []);
+
   // Close export dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -61,86 +104,69 @@ export default function Reports() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const formatCSVCell = (value: any): string => {
-    if (value === null || value === undefined) return '""';
-    const stringVal = String(value);
-    return `"${stringVal.replace(/"/g, '""').replace(/\r?\n|\r/g, ' ')}"`;
+  // Quick 1-click structured export handlers
+  const handleExportIncidents = () => {
+    try {
+      const target = filteredReports.filter(r => r.type === 'incident');
+      if (target.length === 0) {
+        toast.error('No incident reports found matching current criteria');
+        setShowExportMenu(false);
+        return;
+      }
+      const res = exportIncidentReportsCSV(filteredReports, {
+        observerMap,
+        incidentMap,
+        customFilenamePrefix: 'ivote_incident_reports'
+      });
+      setShowExportMenu(false);
+      toast.success(`Exported ${res.count} Incident Reports to ${res.filename}`);
+    } catch (err: any) {
+      toast.error('Failed to export incident reports: ' + err.message);
+    }
+  };
+
+  const handleExportAccreditation = () => {
+    try {
+      const target = filteredReports.filter(r => r.type === 'accreditation');
+      if (target.length === 0) {
+        toast.error('No accreditation reports found matching current criteria');
+        setShowExportMenu(false);
+        return;
+      }
+      const res = exportAccreditationReportsCSV(filteredReports, {
+        observerMap,
+        incidentMap,
+        customFilenamePrefix: 'ivote_accreditation_reports'
+      });
+      setShowExportMenu(false);
+      toast.success(`Exported ${res.count} Accreditation Records to ${res.filename}`);
+    } catch (err: any) {
+      toast.error('Failed to export accreditation reports: ' + err.message);
+    }
+  };
+
+  const handleExportMaster = (exportAll = false) => {
+    try {
+      const target = exportAll ? reports : filteredReports;
+      if (target.length === 0) {
+        toast.error('No reports available to export with current filters');
+        setShowExportMenu(false);
+        return;
+      }
+      const res = exportMasterReportsCSV(target, {
+        observerMap,
+        incidentMap,
+        customFilenamePrefix: exportAll ? 'ivote_all_master_reports' : 'ivote_filtered_master_reports'
+      });
+      setShowExportMenu(false);
+      toast.success(`Exported ${res.count} Reports to ${res.filename}`);
+    } catch (err: any) {
+      toast.error('Failed to export master reports: ' + err.message);
+    }
   };
 
   const exportToCSV = (exportAll = false) => {
-    const targetReports = exportAll ? reports : filteredReports;
-
-    if (targetReports.length === 0) {
-      toast.error('No reports available to export with current filters.');
-      setShowExportMenu(false);
-      return;
-    }
-
-    const headers = [
-      'Report ID',
-      'Polling Unit ID',
-      'Observer ID',
-      'Report Type',
-      'Timestamp',
-      'Election Level',
-      'Voter Count / Turnout',
-      'Description / Notes',
-      'APC Votes',
-      'PDP Votes',
-      'LP Votes',
-      'NNPP Votes',
-      'Other Votes',
-      'Severity',
-      'Latitude',
-      'Longitude'
-    ];
-
-    const rows = targetReports.map((r) => {
-      const payload = r.payload || {};
-      const timestampFormatted = (r.timestamp as any)?.toDate 
-        ? format((r.timestamp as any).toDate(), 'yyyy-MM-dd HH:mm:ss')
-        : (r.timestamp ? String(r.timestamp) : 'N/A');
-
-      return [
-        formatCSVCell(r.id),
-        formatCSVCell(r.pollingUnitId),
-        formatCSVCell(r.observerId || 'Unassigned'),
-        formatCSVCell(r.type),
-        formatCSVCell(timestampFormatted),
-        formatCSVCell(payload.electionLevel || 'General'),
-        formatCSVCell(payload.voterCount || ''),
-        formatCSVCell(payload.description || ''),
-        formatCSVCell(payload.apcVotes || ''),
-        formatCSVCell(payload.pdpVotes || ''),
-        formatCSVCell(payload.lpVotes || ''),
-        formatCSVCell(payload.nnppVotes || ''),
-        formatCSVCell(payload.otherVotes || ''),
-        formatCSVCell(payload.severity || ''),
-        formatCSVCell(r.location?.lat || ''),
-        formatCSVCell(r.location?.lng || '')
-      ].join(',');
-    });
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    const timestampStr = format(new Date(), 'yyyyMMdd_HHmm');
-    const fileName = exportAll 
-      ? `ivote_all_field_reports_${timestampStr}.csv`
-      : `ivote_filtered_reports_${filterType}_${timestampStr}.csv`;
-
-    link.setAttribute('href', url);
-    link.setAttribute('download', fileName);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setShowExportMenu(false);
-    toast.success(`Exported ${targetReports.length} reports as CSV`);
+    handleExportMaster(exportAll);
   };
 
   const exportToPDF = () => {
@@ -451,30 +477,28 @@ export default function Reports() {
             <option value="result">Official PU Results</option>
           </select>
 
-          {/* Primary Quick Download CSV Button */}
+          {/* Primary 'Download Reports' Action Button */}
           <button
-            onClick={() => exportToCSV(false)}
-            disabled={filteredReports.length === 0}
-            className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-2xl shadow-sm text-sm font-bold transition-all cursor-pointer"
-            title="Download currently filtered reports as CSV for external spreadsheets/analysis"
+            onClick={() => setIsDownloadModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-sm text-sm font-bold transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 min-h-[44px]"
+            title="Open Download Reports Center to export structured Incident and Accreditation CSV datasets"
           >
             <Download className="w-4 h-4" />
-            <span>Download CSV</span>
-            {filteredReports.length > 0 && (
-              <span className="ml-0.5 px-2 py-0.5 bg-emerald-700/90 rounded-full text-xs font-mono">
-                {filteredReports.length}
-              </span>
-            )}
+            <span>Download Reports</span>
+            <span className="ml-0.5 px-2 py-0.5 bg-emerald-700/90 rounded-full text-xs font-mono font-bold">
+              {filteredReports.length}
+            </span>
           </button>
 
           {/* More Export Options Dropdown Menu */}
           <div className="relative" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="flex items-center gap-1.5 px-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all"
-              title="More export options"
+              className="flex items-center gap-1.5 px-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all min-h-[44px] cursor-pointer"
+              title="Quick structured export options"
             >
-              <span>More</span>
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Quick CSV</span>
               <ChevronDown className="w-4 h-4 text-gray-500" />
             </button>
             
@@ -484,41 +508,92 @@ export default function Reports() {
                   initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+                  className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
                 >
-                  <div className="px-4 py-2 border-b border-gray-50 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                    Export Dataset
+                  <div className="px-4 py-2 border-b border-gray-50 text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Structured CSV Exports</span>
+                    <span className="text-[10px] font-mono text-emerald-600 font-bold">RFC 4180</span>
                   </div>
                   
+                  {/* Export Incidents Only */}
                   <button
-                    onClick={() => exportToCSV(false)}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors"
+                    onClick={handleExportIncidents}
+                    className="w-full px-4 py-2.5 text-left hover:bg-red-50 text-xs font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5">
-                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                      <span>Filtered CSV</span>
+                      <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center font-bold">
+                        <ShieldAlert className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">Incident Reports CSV</div>
+                        <div className="text-[10px] text-gray-500">Severity, Categories & Coordinates</div>
+                      </div>
                     </div>
-                    <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    <span className="text-[11px] font-mono font-bold text-red-700 bg-red-100/80 px-2 py-0.5 rounded-full">
+                      {filteredReports.filter(r => r.type === 'incident').length}
+                    </span>
+                  </button>
+
+                  {/* Export Accreditation Only */}
+                  <button
+                    onClick={handleExportAccreditation}
+                    className="w-full px-4 py-2.5 text-left hover:bg-emerald-50 text-xs font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">Accreditation Data CSV</div>
+                        <div className="text-[10px] text-gray-500">BVAS Health, Turnout & Queues</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                      {filteredReports.filter(r => r.type === 'accreditation').length}
+                    </span>
+                  </button>
+
+                  {/* Export Master Dataset */}
+                  <button
+                    onClick={() => handleExportMaster(false)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-blue-50 text-xs font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">Master Dataset CSV</div>
+                        <div className="text-[10px] text-gray-500">Unified Incidents, BVAS & Results</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
                       {filteredReports.length}
                     </span>
                   </button>
 
+                  <div className="my-1 border-t border-gray-100" />
+
+                  {/* Open Download Reports Center Modal */}
                   <button
-                    onClick={() => exportToCSV(true)}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors"
+                    onClick={() => {
+                      setShowExportMenu(false);
+                      setIsDownloadModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-emerald-50/80 text-xs font-bold text-emerald-800 flex items-center justify-between gap-2.5 transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <Layers className="w-4 h-4 text-blue-600" />
-                      <span>All Reports CSV</span>
+                    <div className="flex items-center gap-2">
+                      <Download className="w-4 h-4 text-emerald-600" />
+                      <span>Configure Advanced Export...</span>
                     </div>
-                    <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                      {reports.length}
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">
+                      MODAL
                     </span>
                   </button>
 
                   <button
                     onClick={exportToPDF}
-                    className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-sm font-semibold text-gray-700 flex items-center gap-2.5 transition-colors border-t border-gray-50"
+                    className="w-full px-4 py-2.5 text-left hover:bg-gray-50 text-xs font-semibold text-gray-600 flex items-center gap-2.5 transition-colors cursor-pointer"
                   >
                     <FileText className="w-4 h-4 text-amber-600" />
                     <span>Download PDF Summary</span>
@@ -740,6 +815,18 @@ export default function Reports() {
       <AuditTrailModal
         isOpen={isAuditTrailOpen}
         onClose={() => setIsAuditTrailOpen(false)}
+      />
+
+      {/* Download Reports & Structured Data Export Modal */}
+      <DownloadReportsModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        allReports={reports}
+        filteredReports={filteredReports}
+        currentFilterType={filterType}
+        searchTerm={searchTerm}
+        observerMap={observerMap}
+        incidentMap={incidentMap}
       />
     </div>
   );
