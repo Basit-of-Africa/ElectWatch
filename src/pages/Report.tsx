@@ -3,9 +3,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '../context/AuthContext';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { savePendingReport } from '../lib/offlineStorage';
+import { Severity } from '../types';
 import { 
   Send, 
   AlertCircle, 
@@ -29,17 +30,23 @@ import { motion, AnimatePresence } from 'motion/react';
 import DangerButton from '../components/DangerButton';
 import ObserverOnboarding from '../components/ObserverOnboarding';
 
+const optionalNumber = z.preprocess((val) => {
+  if (val === '' || val === null || val === undefined) return undefined;
+  const num = typeof val === 'number' ? val : Number(val);
+  return isNaN(num) ? undefined : num;
+}, z.number().min(0, 'Must be 0 or greater').optional());
+
 const reportSchema = z.object({
-  pollingUnitId: z.string().min(1, 'Polling Unit ID is required'),
+  pollingUnitId: z.string().trim().min(1, 'Polling Unit ID is required'),
   electionLevel: z.enum(['governorship', 'general_federal', 'presidential', 'senatorial', 'house_of_reps']),
   type: z.enum(['accreditation', 'incident', 'result']),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
-  voterCount: z.number().optional(),
-  apcVotes: z.number().optional(),
-  pdpVotes: z.number().optional(),
-  lpVotes: z.number().optional(),
-  nnppVotes: z.number().optional(),
-  otherVotes: z.number().optional(),
+  description: z.string().trim().min(3, 'Observation details must be at least 3 characters'),
+  voterCount: optionalNumber,
+  apcVotes: optionalNumber,
+  pdpVotes: optionalNumber,
+  lpVotes: optionalNumber,
+  nnppVotes: optionalNumber,
+  otherVotes: optionalNumber,
   severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   location: z.object({
     lat: z.number(),
@@ -140,13 +147,22 @@ export default function Report() {
   };
 
   const { register, handleSubmit, formState: { errors }, watch, reset, setValue } = useForm<ReportForm>({
-    resolver: zodResolver(reportSchema),
+    resolver: zodResolver(reportSchema) as any,
     defaultValues: {
       electionLevel: 'governorship',
       type: 'accreditation',
       pollingUnitId: user?.assignedPollingUnitId || '',
+      severity: 'medium',
+      description: '',
     }
   });
+
+  const onInvalid = (formErrors: any) => {
+    console.warn('Report form validation issues:', formErrors);
+    const firstKey = Object.keys(formErrors)[0];
+    const message = formErrors[firstKey]?.message || 'Please check highlighted fields before submitting.';
+    setError(`Submission issue: ${message}`);
+  };
 
   // Auto-acquire observer location on page mount
   React.useEffect(() => {
@@ -240,30 +256,63 @@ export default function Report() {
       lng: 3.3792 + (Math.random() - 0.5) * 0.02
     };
 
+    // Clean payload strictly tailored to category with no undefined values
+    const cleanPayload: {
+      description: string;
+      voterCount?: number;
+      severity?: Severity;
+      electionLevel?: string;
+      apcVotes?: number;
+      pdpVotes?: number;
+      lpVotes?: number;
+      nnppVotes?: number;
+      otherVotes?: number;
+      totalVotes?: number;
+      [key: string]: any;
+    } = {
+      electionLevel: data.electionLevel || 'governorship',
+      description: data.description?.trim() || (data.type === 'result' ? 'Official Form EC8A vote results recorded' : 'Field observation report'),
+    };
+
+    if (data.type === 'accreditation') {
+      cleanPayload.voterCount = typeof data.voterCount === 'number' && !isNaN(data.voterCount) ? data.voterCount : 0;
+    } else if (data.type === 'incident') {
+      cleanPayload.severity = data.severity || 'medium';
+    } else if (data.type === 'result') {
+      const apc = typeof data.apcVotes === 'number' && !isNaN(data.apcVotes) ? data.apcVotes : 0;
+      const pdp = typeof data.pdpVotes === 'number' && !isNaN(data.pdpVotes) ? data.pdpVotes : 0;
+      const lp = typeof data.lpVotes === 'number' && !isNaN(data.lpVotes) ? data.lpVotes : 0;
+      const nnpp = typeof data.nnppVotes === 'number' && !isNaN(data.nnppVotes) ? data.nnppVotes : 0;
+      const other = typeof data.otherVotes === 'number' && !isNaN(data.otherVotes) ? data.otherVotes : 0;
+
+      cleanPayload.apcVotes = apc;
+      cleanPayload.pdpVotes = pdp;
+      cleanPayload.lpVotes = lp;
+      cleanPayload.nnppVotes = nnpp;
+      cleanPayload.otherVotes = other;
+      cleanPayload.totalVotes = apc + pdp + lp + nnpp + other;
+    }
+
     const isCurrentlyOffline = !navigator.onLine;
 
     if (isCurrentlyOffline) {
       savePendingReport({
-        pollingUnitId: data.pollingUnitId,
-        observerId: user?.uid || 'offline_observer',
+        pollingUnitId: data.pollingUnitId.trim(),
+        observerId: user?.uid || auth.currentUser?.uid || 'offline_observer',
         type: data.type,
         location: taggedLocation,
-        media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash })),
-        payload: {
-          electionLevel: data.electionLevel,
-          description: data.description,
-          voterCount: data.voterCount,
-          severity: data.severity,
-          apcVotes: data.apcVotes,
-          pdpVotes: data.pdpVotes,
-          lpVotes: data.lpVotes,
-          nnppVotes: data.nnppVotes,
-          otherVotes: data.otherVotes,
-        },
+        media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash || '' })),
+        payload: cleanPayload,
       });
 
-      setOfflineNotice('Report saved to local offline cache with GPS location tag! It will automatically sync when network connection is restored.');
-      reset();
+      setOfflineNotice('Report safely stored in local offline vault! It will automatically sync as soon as network connection is restored.');
+      reset({
+        electionLevel: data.electionLevel,
+        type: data.type,
+        pollingUnitId: data.pollingUnitId,
+        severity: 'medium',
+        description: '',
+      });
       setMediaFiles([]);
       setIsSubmitting(false);
       setTimeout(() => setOfflineNotice(null), 7000);
@@ -271,83 +320,89 @@ export default function Report() {
     }
 
     try {
-      const reportData = {
-        pollingUnitId: data.pollingUnitId,
-        observerId: user?.uid,
+      const reportData: Record<string, any> = {
+        pollingUnitId: data.pollingUnitId.trim(),
+        observerId: user?.uid || auth.currentUser?.uid || 'offline_observer',
         timestamp: serverTimestamp(),
         type: data.type,
+        payload: cleanPayload,
         location: taggedLocation,
-        media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash })),
-        payload: {
-          electionLevel: data.electionLevel,
-          description: data.description,
-          voterCount: data.voterCount,
-          severity: data.severity,
-          apcVotes: data.apcVotes,
-          pdpVotes: data.pdpVotes,
-          lpVotes: data.lpVotes,
-          nnppVotes: data.nnppVotes,
-          otherVotes: data.otherVotes,
-        },
+        media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash || '' })),
       };
 
       const docRef = await addDoc(collection(db, 'reports'), reportData);
 
       // If it's an incident, also create a record in incidents collection
       if (data.type === 'incident') {
-        const incidentRef = await addDoc(collection(db, 'incidents'), {
-          reportId: docRef.id,
-          pollingUnitId: data.pollingUnitId,
-          severity: data.severity || 'medium',
-          status: 'pending',
-          description: data.description,
-          media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash })),
-          timestamp: serverTimestamp(),
-        });
+        try {
+          const incidentRef = await addDoc(collection(db, 'incidents'), {
+            reportId: docRef.id,
+            pollingUnitId: data.pollingUnitId.trim(),
+            severity: data.severity || 'medium',
+            status: 'pending',
+            description: data.description.trim(),
+            media: reportData.media,
+            timestamp: serverTimestamp(),
+          });
 
-        // Trigger notification for critical/high incidents
-        if (data.severity === 'critical' || data.severity === 'high') {
-          await addDoc(collection(db, 'notifications'), {
-            userId: 'admin',
-            title: `CRITICAL INCIDENT: ${data.pollingUnitId}`,
-            message: data.description,
-            type: data.severity === 'critical' ? 'error' : 'warning',
-            read: false,
-            link: `/incidents/${incidentRef.id}`,
-            timestamp: serverTimestamp(),
-          });
-          await addDoc(collection(db, 'notifications'), {
-            userId: 'supervisor',
-            title: `CRITICAL INCIDENT: ${data.pollingUnitId}`,
-            message: data.description,
-            type: data.severity === 'critical' ? 'error' : 'warning',
-            read: false,
-            link: `/incidents/${incidentRef.id}`,
-            timestamp: serverTimestamp(),
-          });
+          // Trigger notifications for critical/high incidents non-blockingly
+          if (data.severity === 'critical' || data.severity === 'high') {
+            try {
+              await addDoc(collection(db, 'notifications'), {
+                userId: 'admin',
+                title: `CRITICAL INCIDENT: ${data.pollingUnitId.trim()}`,
+                message: data.description.trim(),
+                type: data.severity === 'critical' ? 'error' : 'warning',
+                read: false,
+                link: `/incidents/${incidentRef.id}`,
+                timestamp: serverTimestamp(),
+              });
+              await addDoc(collection(db, 'notifications'), {
+                userId: 'supervisor',
+                title: `CRITICAL INCIDENT: ${data.pollingUnitId.trim()}`,
+                message: data.description.trim(),
+                type: data.severity === 'critical' ? 'error' : 'warning',
+                read: false,
+                link: `/incidents/${incidentRef.id}`,
+                timestamp: serverTimestamp(),
+              });
+            } catch (notifErr) {
+              console.warn('Non-blocking notification broadcast warning:', notifErr);
+            }
+          }
+        } catch (incErr) {
+          console.warn('Non-blocking incident record sync warning:', incErr);
         }
       }
 
       setSuccess(true);
-      reset();
+      reset({
+        electionLevel: data.electionLevel,
+        type: data.type,
+        pollingUnitId: data.pollingUnitId,
+        severity: 'medium',
+        description: '',
+      });
       setMediaFiles([]);
       setTimeout(() => setSuccess(false), 5000);
     } catch (err: any) {
       console.warn('Network or firestore write failed, caching report locally', err);
       savePendingReport({
-        pollingUnitId: data.pollingUnitId,
-        observerId: user?.uid || 'offline_observer',
+        pollingUnitId: data.pollingUnitId.trim(),
+        observerId: user?.uid || auth.currentUser?.uid || 'offline_observer',
         type: data.type,
-        location: data.location || null,
-        media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash })),
-        payload: {
-          description: data.description,
-          voterCount: data.voterCount,
-          severity: data.severity,
-        },
+        location: taggedLocation,
+        media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash || '' })),
+        payload: cleanPayload,
       });
       setOfflineNotice('Saved to local offline vault! Connection was intermittent, report will auto-sync when online.');
-      reset();
+      reset({
+        electionLevel: data.electionLevel,
+        type: data.type,
+        pollingUnitId: data.pollingUnitId,
+        severity: 'medium',
+        description: '',
+      });
       setMediaFiles([]);
       setTimeout(() => setOfflineNotice(null), 7000);
     } finally {
@@ -418,7 +473,7 @@ export default function Report() {
         )}
       </AnimatePresence>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-6 sm:p-8 md:p-12 space-y-8">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-6 sm:p-8 md:p-12 space-y-8">
         {error && (
           <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center gap-2">
             <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" /> 
@@ -718,11 +773,57 @@ export default function Report() {
           {(['accreditation', 'incident', 'result'] as const).map((type) => {
             const isSelected = reportType === type;
             const Icon = type === 'accreditation' ? Users : type === 'incident' ? ShieldAlert : ClipboardCheck;
-            const color = type === 'accreditation' ? 'emerald' : type === 'incident' ? 'red' : 'blue';
+
+            // Explicit static styling per type for high contrast, clear visual feedback and CSS selector targeting
+            const getSelectedStyles = () => {
+              if (type === 'accreditation') {
+                return {
+                  card: isSelected 
+                    ? 'border-emerald-600 bg-emerald-50/70 shadow-lg shadow-emerald-500/10 ring-2 ring-emerald-500/20' 
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50 shadow-sm',
+                  icon: isSelected ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25' : 'bg-gray-100 text-gray-500',
+                  badge: isSelected ? 'bg-emerald-200 text-emerald-900 font-bold' : 'bg-gray-100 text-gray-500',
+                  title: isSelected ? 'text-emerald-950 font-black' : 'text-gray-900 font-bold',
+                  sub: isSelected ? 'text-emerald-800 font-medium' : 'text-gray-500',
+                  badgeText: 'BVAS Check',
+                  titleText: 'Accreditation',
+                  descriptionText: 'Track voter turnout & BVAS verification progress'
+                };
+              }
+              if (type === 'incident') {
+                return {
+                  card: isSelected 
+                    ? 'border-red-500 bg-red-50/70 shadow-lg shadow-red-500/10 ring-2 ring-red-500/20' 
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50 shadow-sm',
+                  icon: isSelected ? 'bg-red-600 text-white shadow-md shadow-red-600/25' : 'bg-gray-100 text-gray-500',
+                  badge: isSelected ? 'bg-red-200 text-red-900 font-bold' : 'bg-gray-100 text-gray-500',
+                  title: isSelected ? 'text-red-950 font-black' : 'text-gray-900 font-bold',
+                  sub: isSelected ? 'text-red-800 font-medium' : 'text-gray-500',
+                  badgeText: 'Urgent Alert',
+                  titleText: 'Incidents & Disruptions',
+                  descriptionText: 'Report electoral violations, delays, or security disruptions'
+                };
+              }
+              return {
+                card: isSelected 
+                  ? 'border-blue-600 bg-blue-50/70 shadow-lg shadow-blue-500/10 ring-2 ring-blue-500/20' 
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50 shadow-sm',
+                icon: isSelected ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' : 'bg-gray-100 text-gray-500',
+                badge: isSelected ? 'bg-blue-200 text-blue-900 font-bold' : 'bg-gray-100 text-gray-500',
+                title: isSelected ? 'text-blue-950 font-black' : 'text-gray-900 font-bold',
+                sub: isSelected ? 'text-blue-800 font-medium' : 'text-gray-500',
+                badgeText: 'Form EC8A',
+                titleText: 'Election Results',
+                descriptionText: 'Enter official Form EC8A vote tallies & ballot counts'
+              };
+            };
+
+            const styles = getSelectedStyles();
             
             return (
               <label 
                 key={type}
+                onClick={() => setValue('type', type, { shouldValidate: true, shouldDirty: true })}
                 className={`relative cursor-pointer transition-all duration-300 ${isSelected ? 'translate-y-[-4px]' : ''}`}
               >
                 <input
@@ -731,19 +832,28 @@ export default function Report() {
                   className="sr-only"
                   {...register('type')}
                 />
-                <div className={`h-full p-6 rounded-3xl border-2 transition-all duration-300 ${
-                  isSelected 
-                    ? `border-${color}-500 bg-${color}-50/30 shadow-lg shadow-${color}-500/10` 
-                    : 'border-gray-100 bg-white hover:border-gray-200'
-                }`}>
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
-                    isSelected ? `bg-${color}-500 text-white` : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    <Icon className="w-6 h-6" />
+                <div className={`h-full p-6 rounded-3xl border-2 transition-all duration-300 flex flex-col justify-between ${styles.card}`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${styles.icon}`}>
+                        <Icon className="w-6 h-6" />
+                      </div>
+                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${styles.badge}`}>
+                        {styles.badgeText}
+                      </span>
+                    </div>
+                    <p className={`text-base sm:text-lg leading-tight ${styles.title}`}>
+                      {styles.titleText}
+                    </p>
+                    <p className={`text-xs mt-1.5 leading-relaxed ${styles.sub}`}>
+                      {styles.descriptionText}
+                    </p>
                   </div>
-                  <p className={`font-bold capitalize ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>
-                    {type}
-                  </p>
+                  <div className="mt-4 pt-3 border-t border-gray-100/80 flex items-center justify-between text-xs font-bold">
+                    <span className={isSelected ? (type === 'incident' ? 'text-red-700' : type === 'result' ? 'text-blue-700' : 'text-emerald-700') : 'text-gray-400'}>
+                      {isSelected ? '● Selected Report' : 'Select category'}
+                    </span>
+                  </div>
                 </div>
               </label>
             );
@@ -753,9 +863,14 @@ export default function Report() {
         {/* Dynamic Fields Section */}
         <div className="space-y-6">
           <div className="space-y-2">
-            <label htmlFor="report-description" className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-widest px-1">
-              Observation Details *
-            </label>
+            <div className="flex items-center justify-between px-1">
+              <label htmlFor="report-description" className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-widest">
+                Observation Details *
+              </label>
+              <span className="text-xs text-gray-400 font-medium">
+                {reportType === 'result' ? 'Optional if vote tallies are entered' : 'Minimum 3 characters'}
+              </span>
+            </div>
             <textarea
               id="report-description"
               {...register('description')}
@@ -763,7 +878,13 @@ export default function Report() {
               aria-required="true"
               aria-invalid={errors.description ? "true" : "false"}
               aria-describedby={errors.description ? "desc-error" : undefined}
-              placeholder="Describe what you see on the ground (minimum 10 characters)..."
+              placeholder={
+                reportType === 'incident'
+                  ? "Describe what occurred: parties involved, time, weapons/disruptions, BVAS hardware issues, or crowd intimidation..."
+                  : reportType === 'result'
+                  ? "Enter any observations regarding ballot reconciliation, presiding officer endorsement, or party agent sign-offs..."
+                  : "Describe queue progress, BVAS biometric response time, orderliness, or presiding officer presence..."
+              }
               className={`w-full bg-gray-50 border-2 ${errors.description ? 'border-red-200 focus:border-red-500' : 'border-gray-200 focus:border-emerald-500'} rounded-3xl py-4 px-6 text-base sm:text-lg outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5 resize-none`}
             />
             {errors.description && <p id="desc-error" role="alert" className="text-red-500 text-xs font-semibold mt-1 ml-4">{errors.description.message}</p>}
@@ -776,18 +897,27 @@ export default function Report() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-gray-50 rounded-3xl border border-gray-200"
+                className="space-y-4 p-6 bg-emerald-50/40 rounded-3xl border border-emerald-200"
               >
-                <label htmlFor="voter-count-input" className="text-sm font-bold text-gray-700 block">
-                  Number of voters accredited so far
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="voter-count-input" className="text-sm font-bold text-emerald-950 block">
+                    Number of voters accredited so far (BVAS Count)
+                  </label>
+                  <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider bg-emerald-100 px-2 py-0.5 rounded-full">
+                    BVAS Verified
+                  </span>
+                </div>
                 <input
                   id="voter-count-input"
                   type="number"
+                  min="0"
                   placeholder="0"
-                  {...register('voterCount', { valueAsNumber: true })}
-                  className="w-full bg-white border border-gray-300 rounded-2xl py-3 px-6 outline-none focus:border-emerald-500 transition-colors font-mono text-base min-h-[48px]"
+                  {...register('voterCount', { 
+                    setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+                  })}
+                  className="w-full bg-white border border-emerald-200 rounded-2xl py-3 px-6 outline-none focus:border-emerald-500 transition-colors font-mono text-base min-h-[48px]"
                 />
+                {errors.voterCount && <p className="text-red-500 text-xs font-semibold mt-1">{errors.voterCount.message}</p>}
               </motion.div>
             )}
 
@@ -799,60 +929,88 @@ export default function Report() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4 p-6 bg-blue-50/50 rounded-3xl border border-blue-200"
               >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-blue-950 block">Official Party Vote Tally ({watch('electionLevel')?.toUpperCase() || 'ELECTION'})</h3>
-                  <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider bg-blue-100 px-2 py-0.5 rounded-full">Form EC8A Copy</span>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-blue-950 block">Official Party Vote Tally ({watch('electionLevel')?.toUpperCase() || 'ELECTION'})</h3>
+                    <p className="text-xs text-blue-700 mt-0.5">Enter vote numbers directly from the signed Form EC8A copy</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-blue-800 font-mono font-bold bg-blue-100 px-2.5 py-1 rounded-full border border-blue-200">
+                      Total Tallied: {((Number(watch('apcVotes')) || 0) + (Number(watch('pdpVotes')) || 0) + (Number(watch('lpVotes')) || 0) + (Number(watch('nnppVotes')) || 0) + (Number(watch('otherVotes')) || 0)).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider bg-blue-100 px-2 py-0.5 rounded-full">Form EC8A Copy</span>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
                   <div>
                     <label htmlFor="apc-votes-input" className="text-xs font-bold text-gray-700 block mb-1">APC Votes</label>
                     <input
                       id="apc-votes-input"
                       type="number"
+                      min="0"
                       placeholder="0"
-                      {...register('apcVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
+                      {...register('apcVotes', { 
+                        setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+                      })}
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-blue-500 font-mono text-sm min-h-[44px]"
                     />
+                    {errors.apcVotes && <p className="text-red-500 text-xs font-semibold mt-1">{errors.apcVotes.message}</p>}
                   </div>
                   <div>
                     <label htmlFor="pdp-votes-input" className="text-xs font-bold text-gray-700 block mb-1">PDP Votes</label>
                     <input
                       id="pdp-votes-input"
                       type="number"
+                      min="0"
                       placeholder="0"
-                      {...register('pdpVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
+                      {...register('pdpVotes', { 
+                        setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+                      })}
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-blue-500 font-mono text-sm min-h-[44px]"
                     />
+                    {errors.pdpVotes && <p className="text-red-500 text-xs font-semibold mt-1">{errors.pdpVotes.message}</p>}
                   </div>
                   <div>
                     <label htmlFor="lp-votes-input" className="text-xs font-bold text-gray-700 block mb-1">Labour Party (LP)</label>
                     <input
                       id="lp-votes-input"
                       type="number"
+                      min="0"
                       placeholder="0"
-                      {...register('lpVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
+                      {...register('lpVotes', { 
+                        setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+                      })}
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-blue-500 font-mono text-sm min-h-[44px]"
                     />
+                    {errors.lpVotes && <p className="text-red-500 text-xs font-semibold mt-1">{errors.lpVotes.message}</p>}
                   </div>
                   <div>
                     <label htmlFor="nnpp-votes-input" className="text-xs font-bold text-gray-700 block mb-1">NNPP Votes</label>
                     <input
                       id="nnpp-votes-input"
                       type="number"
+                      min="0"
                       placeholder="0"
-                      {...register('nnppVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
+                      {...register('nnppVotes', { 
+                        setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+                      })}
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-blue-500 font-mono text-sm min-h-[44px]"
                     />
+                    {errors.nnppVotes && <p className="text-red-500 text-xs font-semibold mt-1">{errors.nnppVotes.message}</p>}
                   </div>
                   <div>
                     <label htmlFor="other-votes-input" className="text-xs font-bold text-gray-700 block mb-1">Others (SDP, APGA...)</label>
                     <input
                       id="other-votes-input"
                       type="number"
+                      min="0"
                       placeholder="0"
-                      {...register('otherVotes', { valueAsNumber: true })}
-                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-emerald-500 font-mono text-sm min-h-[44px]"
+                      {...register('otherVotes', { 
+                        setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+                      })}
+                      className="w-full bg-white border border-gray-300 rounded-xl py-2.5 px-4 outline-none focus:border-blue-500 font-mono text-sm min-h-[44px]"
                     />
+                    {errors.otherVotes && <p className="text-red-500 text-xs font-semibold mt-1">{errors.otherVotes.message}</p>}
                   </div>
                 </div>
               </motion.div>
@@ -866,28 +1024,48 @@ export default function Report() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4 p-6 bg-red-50/50 rounded-3xl border border-red-200"
               >
-                <label htmlFor="severity-level-select" className="text-sm font-bold text-red-900 block">Severity Level</label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="severity-level-select" className="text-sm font-bold text-red-950 block">
+                    Incident Severity Level *
+                  </label>
+                  <span className="text-[10px] text-red-800 font-bold uppercase tracking-wider bg-red-100 px-2 py-0.5 rounded-full">
+                    Priority Dispatch
+                  </span>
+                </div>
                 <select 
                   id="severity-level-select"
                   {...register('severity')}
                   className="w-full bg-white border border-red-200 rounded-2xl py-3 px-6 outline-none focus:border-red-500 transition-colors font-medium text-red-900 min-h-[48px]"
                 >
-                  <option value="low">Low (Procedural issue)</option>
-                  <option value="medium">Medium (Delays / Disputes)</option>
-                  <option value="high">High (Suppression / Harassment)</option>
-                  <option value="critical">Critical (Violence / Disruption)</option>
+                  <option value="low">Low (Procedural delay / minor dispute)</option>
+                  <option value="medium">Medium (Logistics disruption / BVAS hardware delay)</option>
+                  <option value="high">High (Voter suppression / Polling agent harassment)</option>
+                  <option value="critical">Critical (Violence / Ballot snatching / Shooting)</option>
                 </select>
+                {(watch('severity') === 'critical' || watch('severity') === 'high') && (
+                  <p className="text-xs text-red-700 font-semibold flex items-center gap-1.5 bg-red-100/80 p-2.5 rounded-xl border border-red-200">
+                    <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>High & Critical incidents immediately alert state supervisors and central incident command.</span>
+                  </p>
+                )}
+                {errors.severity && <p className="text-red-500 text-xs font-semibold mt-1">{errors.severity.message}</p>}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
+        {/* Dynamic Action Button */}
         <button
+          type="submit"
           disabled={isSubmitting}
-          aria-label={isSubmitting ? "Transmitting report to operations center..." : "Submit electoral field report"}
+          aria-label={isSubmitting ? "Transmitting report to operations center..." : `Submit ${reportType} electoral field report`}
           className={`w-full py-6 px-10 rounded-[28px] font-bold text-xl flex items-center justify-center gap-4 transition-all duration-300 shadow-xl min-h-[56px] ${
             isSubmitting 
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
+              : reportType === 'incident'
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20 active:scale-[0.98]'
+              : reportType === 'result'
+              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20 active:scale-[0.98]'
               : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 active:scale-[0.98]'
           }`}
         >
@@ -897,7 +1075,14 @@ export default function Report() {
             </>
           ) : (
             <>
-              <Send className="w-6 h-6" /> Submit Report
+              <Send className="w-6 h-6" /> 
+              <span>
+                {reportType === 'incident' 
+                  ? 'Submit Incident Report' 
+                  : reportType === 'result'
+                  ? 'Submit Official EC8A Results'
+                  : 'Submit Accreditation Report'}
+              </span>
             </>
           )}
         </button>

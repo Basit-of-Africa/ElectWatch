@@ -21,6 +21,8 @@ export interface PendingReport {
     lpVotes?: number;
     nnppVotes?: number;
     otherVotes?: number;
+    totalVotes?: number;
+    [key: string]: any;
   };
   status: 'pending' | 'syncing' | 'failed';
   errorMessage?: string;
@@ -189,19 +191,19 @@ export const syncPendingReports = async (overrideObserverId?: string) => {
         const incidentRef = await addDoc(collection(db, 'incidents'), {
           reportId: docRef.id,
           pollingUnitId: item.pollingUnitId,
-          severity: item.payload.severity || 'medium',
+          severity: item.payload?.severity || 'medium',
           status: 'pending',
-          description: item.payload.description,
+          description: item.payload?.description || 'Incident reported by field observer',
           timestamp: serverTimestamp(),
         });
 
-        if (item.payload.severity === 'critical' || item.payload.severity === 'high') {
+        if (item.payload?.severity === 'critical' || item.payload?.severity === 'high') {
           try {
             await addDoc(collection(db, 'notifications'), {
               userId: 'admin',
               title: `CRITICAL INCIDENT: ${item.pollingUnitId}`,
-              message: item.payload.description,
-              type: item.payload.severity === 'critical' ? 'error' : 'warning',
+              message: item.payload?.description || 'Critical incident alert',
+              type: item.payload?.severity === 'critical' ? 'error' : 'warning',
               read: false,
               link: `/incidents/${incidentRef.id}`,
               timestamp: serverTimestamp(),
@@ -209,8 +211,8 @@ export const syncPendingReports = async (overrideObserverId?: string) => {
             await addDoc(collection(db, 'notifications'), {
               userId: 'supervisor',
               title: `CRITICAL INCIDENT: ${item.pollingUnitId}`,
-              message: item.payload.description,
-              type: item.payload.severity === 'critical' ? 'error' : 'warning',
+              message: item.payload?.description || 'Critical incident alert',
+              type: item.payload?.severity === 'critical' ? 'error' : 'warning',
               read: false,
               link: `/incidents/${incidentRef.id}`,
               timestamp: serverTimestamp(),

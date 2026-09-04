@@ -35,6 +35,7 @@ let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
     experimentalAutoDetectLongPolling: true,
+    ignoreUndefinedProperties: true,
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager()
     })
@@ -42,7 +43,8 @@ try {
 } catch (e) {
   try {
     firestoreDb = initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true
+      experimentalAutoDetectLongPolling: true,
+      ignoreUndefinedProperties: true
     }, firebaseConfig.firestoreDatabaseId || undefined);
   } catch (err) {
     firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
