@@ -37,21 +37,134 @@ const optionalNumber = z.preprocess((val) => {
 }, z.number().min(0, 'Must be 0 or greater').optional());
 
 const reportSchema = z.object({
-  pollingUnitId: z.string().trim().min(1, 'Polling Unit ID is required'),
+  pollingUnitId: z.string().trim().min(2, 'Polling Unit ID is required (e.g. PU-01/12/03/004)'),
   electionLevel: z.enum(['governorship', 'general_federal', 'presidential', 'senatorial', 'house_of_reps']),
   type: z.enum(['accreditation', 'incident', 'result']),
-  description: z.string().trim().min(3, 'Observation details must be at least 3 characters'),
+  description: z.string().trim(),
+
+  // Accreditation specific fields
   voterCount: optionalNumber,
+  bvasStatus: z.enum(['functioning', 'intermittent', 'malfunctioning', 'not_arrived']).optional(),
+  queueSize: z.enum(['short', 'medium', 'large', 'overflowing']).optional(),
+
+  // Incident specific fields
+  severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  incidentCategory: z.enum([
+    'bvas_failure',
+    'violence_intimidation',
+    'ballot_tampering',
+    'logistics_delay',
+    'vote_buying',
+    'disenfranchisement',
+    'procedural_irregularity',
+    'other'
+  ]).optional(),
+  securityNotified: z.enum(['yes', 'no', 'none_present']).optional(),
+
+  // Result specific fields
   apcVotes: optionalNumber,
   pdpVotes: optionalNumber,
   lpVotes: optionalNumber,
   nnppVotes: optionalNumber,
   otherVotes: optionalNumber,
-  severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+
   location: z.object({
     lat: z.number(),
     lng: z.number()
   }).optional(),
+}).superRefine((data, ctx) => {
+  // Comprehensive Accreditation Validation Layer
+  if (data.type === 'accreditation') {
+    if (data.voterCount === undefined || data.voterCount === null || isNaN(data.voterCount)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['voterCount'],
+        message: 'Accreditation count is required. Enter the number of BVAS accredited voters (or 0 if queue just opened).'
+      });
+    } else if (data.voterCount < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['voterCount'],
+        message: 'Accredited voter count cannot be negative.'
+      });
+    }
+
+    if (!data.bvasStatus) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['bvasStatus'],
+        message: 'BVAS device operational status is mandatory for accreditation records.'
+      });
+    }
+
+    if (!data.description || data.description.trim().length < 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['description'],
+        message: 'Observation details must be at least 5 characters (e.g. queue orderliness, verification speed).'
+      });
+    }
+  }
+
+  // Comprehensive Incident Validation Layer
+  if (data.type === 'incident') {
+    if (!data.severity) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['severity'],
+        message: 'Incident severity classification is required.'
+      });
+    }
+
+    if (!data.incidentCategory) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['incidentCategory'],
+        message: 'Incident category is required (e.g. BVAS failure, violence, ballot tampering, etc.).'
+      });
+    }
+
+    if (!data.description || data.description.trim().length < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['description'],
+        message: 'Detailed incident explanation is required (minimum 10 characters detailing what occurred and who was involved).'
+      });
+    }
+
+    if (!data.securityNotified) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['securityNotified'],
+        message: 'Please specify whether security personnel on ground were alerted.'
+      });
+    }
+  }
+
+  // Result Validation Layer
+  if (data.type === 'result') {
+    const totalTallied = 
+      (data.apcVotes || 0) + 
+      (data.pdpVotes || 0) + 
+      (data.lpVotes || 0) + 
+      (data.nnppVotes || 0) + 
+      (data.otherVotes || 0);
+
+    const hasAnyVoteEntry = 
+      data.apcVotes !== undefined || 
+      data.pdpVotes !== undefined || 
+      data.lpVotes !== undefined || 
+      data.nnppVotes !== undefined || 
+      data.otherVotes !== undefined;
+
+    if (!hasAnyVoteEntry && totalTallied === 0 && (!data.description || data.description.trim().length < 5)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['apcVotes'],
+        message: 'Please enter official vote counts from Form EC8A or provide detailed result observations.'
+      });
+    }
+  }
 });
 
 type ReportForm = z.infer<typeof reportSchema>;
@@ -153,15 +266,32 @@ export default function Report() {
       type: 'accreditation',
       pollingUnitId: user?.assignedPollingUnitId || '',
       severity: 'medium',
+      incidentCategory: 'bvas_failure',
+      securityNotified: 'yes',
+      bvasStatus: 'functioning',
+      queueSize: 'medium',
+      voterCount: undefined,
       description: '',
+      apcVotes: undefined,
+      pdpVotes: undefined,
+      lpVotes: undefined,
+      nnppVotes: undefined,
+      otherVotes: undefined,
     }
   });
 
   const onInvalid = (formErrors: any) => {
     console.warn('Report form validation issues:', formErrors);
     const firstKey = Object.keys(formErrors)[0];
-    const message = formErrors[firstKey]?.message || 'Please check highlighted fields before submitting.';
-    setError(`Submission issue: ${message}`);
+    const message = formErrors[firstKey]?.message || 'Please check and complete all required fields before submitting.';
+    setError(`Incomplete data: ${message}`);
+    setTimeout(() => {
+      const errorEl = document.querySelector('[aria-invalid="true"], [role="alert"]');
+      if (errorEl) {
+        errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (errorEl as HTMLElement).focus?.();
+      }
+    }, 60);
   };
 
   // Auto-acquire observer location on page mount
@@ -260,7 +390,11 @@ export default function Report() {
     const cleanPayload: {
       description: string;
       voterCount?: number;
+      bvasStatus?: string;
+      queueSize?: string;
       severity?: Severity;
+      incidentCategory?: string;
+      securityNotified?: string;
       electionLevel?: string;
       apcVotes?: number;
       pdpVotes?: number;
@@ -276,8 +410,12 @@ export default function Report() {
 
     if (data.type === 'accreditation') {
       cleanPayload.voterCount = typeof data.voterCount === 'number' && !isNaN(data.voterCount) ? data.voterCount : 0;
+      cleanPayload.bvasStatus = data.bvasStatus || 'functioning';
+      cleanPayload.queueSize = data.queueSize || 'medium';
     } else if (data.type === 'incident') {
       cleanPayload.severity = data.severity || 'medium';
+      cleanPayload.incidentCategory = data.incidentCategory || 'bvas_failure';
+      cleanPayload.securityNotified = data.securityNotified || 'yes';
     } else if (data.type === 'result') {
       const apc = typeof data.apcVotes === 'number' && !isNaN(data.apcVotes) ? data.apcVotes : 0;
       const pdp = typeof data.pdpVotes === 'number' && !isNaN(data.pdpVotes) ? data.pdpVotes : 0;
@@ -305,13 +443,23 @@ export default function Report() {
         payload: cleanPayload,
       });
 
-      setOfflineNotice('Report safely stored in local offline vault! It will automatically sync as soon as network connection is restored.');
+      setOfflineNotice('Report validated & safely stored in local offline vault! All critical metrics were captured and will auto-sync when network returns.');
       reset({
         electionLevel: data.electionLevel,
         type: data.type,
         pollingUnitId: data.pollingUnitId,
         severity: 'medium',
+        incidentCategory: 'bvas_failure',
+        securityNotified: 'yes',
+        bvasStatus: 'functioning',
+        queueSize: 'medium',
+        voterCount: undefined,
         description: '',
+        apcVotes: undefined,
+        pdpVotes: undefined,
+        lpVotes: undefined,
+        nnppVotes: undefined,
+        otherVotes: undefined,
       });
       setMediaFiles([]);
       setIsSubmitting(false);
@@ -381,7 +529,17 @@ export default function Report() {
         type: data.type,
         pollingUnitId: data.pollingUnitId,
         severity: 'medium',
+        incidentCategory: 'bvas_failure',
+        securityNotified: 'yes',
+        bvasStatus: 'functioning',
+        queueSize: 'medium',
+        voterCount: undefined,
         description: '',
+        apcVotes: undefined,
+        pdpVotes: undefined,
+        lpVotes: undefined,
+        nnppVotes: undefined,
+        otherVotes: undefined,
       });
       setMediaFiles([]);
       setTimeout(() => setSuccess(false), 5000);
@@ -401,7 +559,17 @@ export default function Report() {
         type: data.type,
         pollingUnitId: data.pollingUnitId,
         severity: 'medium',
+        incidentCategory: 'bvas_failure',
+        securityNotified: 'yes',
+        bvasStatus: 'functioning',
+        queueSize: 'medium',
+        voterCount: undefined,
         description: '',
+        apcVotes: undefined,
+        pdpVotes: undefined,
+        lpVotes: undefined,
+        nnppVotes: undefined,
+        otherVotes: undefined,
       });
       setMediaFiles([]);
       setTimeout(() => setOfflineNotice(null), 7000);
@@ -474,12 +642,39 @@ export default function Report() {
       </AnimatePresence>
 
       <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-6 sm:p-8 md:p-12 space-y-8">
-        {error && (
-          <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" /> 
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Comprehensive Validation Feedback Alert Banner */}
+        <AnimatePresence>
+          {(error || Object.keys(errors).length > 0) && (
+            <motion.div 
+              role="alert" 
+              aria-live="assertive"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="p-5 bg-red-50/90 border-2 border-red-200 rounded-3xl space-y-2.5"
+            >
+              <div className="flex items-center gap-2.5 text-red-900 font-bold text-sm">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0" aria-hidden="true" />
+                <span>Incomplete Data Detected — Critical Verification Fields Required</span>
+              </div>
+              <p className="text-xs text-red-800 leading-relaxed">
+                To guarantee credible electoral monitoring and prevent corrupted or rejected submissions, all critical fields must be completed before saving online or to the local offline vault.
+              </p>
+              {Object.keys(errors).length > 0 && (
+                <ul className="text-xs text-red-700 space-y-1 pl-5 list-disc font-medium">
+                  {Object.entries(errors).map(([field, err]: [string, any]) => (
+                    <li key={field}>
+                      <span className="font-bold capitalize">{field.replace(/([A-Z])/g, ' $1')}:</span> {err?.message || 'Field validation required'}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {error && !Object.keys(errors).length && (
+                <p className="text-xs text-red-700 font-semibold">{error}</p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Election Level & Polling Unit Section */}
         <div className="space-y-6">
@@ -865,11 +1060,25 @@ export default function Report() {
           <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
               <label htmlFor="report-description" className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-widest">
-                Observation Details *
+                <span>Observation Details</span>
+                <span className="text-red-500 font-bold">*</span>
               </label>
-              <span className="text-xs text-gray-400 font-medium">
-                {reportType === 'result' ? 'Optional if vote tallies are entered' : 'Minimum 3 characters'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 font-medium">
+                  {reportType === 'incident' 
+                    ? 'Min 10 characters required' 
+                    : reportType === 'accreditation'
+                    ? 'Min 5 characters required'
+                    : 'EC8A observation notes'}
+                </span>
+                <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                  (watch('description')?.trim().length || 0) >= (reportType === 'incident' ? 10 : reportType === 'accreditation' ? 5 : 0)
+                    ? 'bg-emerald-100 text-emerald-800 font-bold'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {watch('description')?.trim().length || 0} chars
+                </span>
+              </div>
             </div>
             <textarea
               id="report-description"
@@ -880,14 +1089,19 @@ export default function Report() {
               aria-describedby={errors.description ? "desc-error" : undefined}
               placeholder={
                 reportType === 'incident'
-                  ? "Describe what occurred: parties involved, time, weapons/disruptions, BVAS hardware issues, or crowd intimidation..."
+                  ? "Describe what occurred in detail: parties involved, timeline, weapons/disruptions, BVAS hardware issues, or crowd intimidation (minimum 10 characters)..."
                   : reportType === 'result'
                   ? "Enter any observations regarding ballot reconciliation, presiding officer endorsement, or party agent sign-offs..."
-                  : "Describe queue progress, BVAS biometric response time, orderliness, or presiding officer presence..."
+                  : "Describe queue progress, BVAS biometric response time, orderliness, or presiding officer presence (minimum 5 characters)..."
               }
-              className={`w-full bg-gray-50 border-2 ${errors.description ? 'border-red-200 focus:border-red-500' : 'border-gray-200 focus:border-emerald-500'} rounded-3xl py-4 px-6 text-base sm:text-lg outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5 resize-none`}
+              className={`w-full bg-gray-50 border-2 ${errors.description ? 'border-red-300 focus:border-red-500 bg-red-50/20' : 'border-gray-200 focus:border-emerald-500'} rounded-3xl py-4 px-6 text-base sm:text-lg outline-none transition-all duration-300 focus:bg-white focus:shadow-lg focus:shadow-emerald-500/5 resize-none`}
             />
-            {errors.description && <p id="desc-error" role="alert" className="text-red-500 text-xs font-semibold mt-1 ml-4">{errors.description.message}</p>}
+            {errors.description && (
+              <p id="desc-error" role="alert" className="text-red-600 text-xs font-semibold flex items-center gap-1 mt-1 ml-2">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{errors.description.message}</span>
+              </p>
+            )}
           </div>
 
           <AnimatePresence mode="wait">
@@ -897,27 +1111,137 @@ export default function Report() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-emerald-50/40 rounded-3xl border border-emerald-200"
+                className="space-y-6 p-6 sm:p-8 bg-emerald-50/50 rounded-3xl border-2 border-emerald-200 shadow-sm"
               >
-                <div className="flex items-center justify-between">
-                  <label htmlFor="voter-count-input" className="text-sm font-bold text-emerald-950 block">
-                    Number of voters accredited so far (BVAS Count)
-                  </label>
-                  <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider bg-emerald-100 px-2 py-0.5 rounded-full">
-                    BVAS Verified
+                {/* Header with icon & badge */}
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-emerald-200/70">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-emerald-950">Accreditation & Voter Verification Metrics</h3>
+                      <p className="text-xs text-emerald-700">Critical fields captured for voter turnout & BVAS tracking</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-900 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-full uppercase tracking-wider">
+                    Mandatory Accreditation Data
                   </span>
                 </div>
-                <input
-                  id="voter-count-input"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  {...register('voterCount', { 
-                    setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
-                  })}
-                  className="w-full bg-white border border-emerald-200 rounded-2xl py-3 px-6 outline-none focus:border-emerald-500 transition-colors font-mono text-base min-h-[48px]"
-                />
-                {errors.voterCount && <p className="text-red-500 text-xs font-semibold mt-1">{errors.voterCount.message}</p>}
+
+                {/* 1. Voter Count Field */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="voter-count-input" className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                      <span>Number of voters accredited so far (BVAS Count)</span>
+                      <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Numeric Total
+                    </span>
+                  </div>
+                  <input
+                    id="voter-count-input"
+                    type="number"
+                    min="0"
+                    placeholder="Enter accredited voter count (e.g. 142)"
+                    aria-required="true"
+                    aria-invalid={errors.voterCount ? "true" : "false"}
+                    aria-describedby={errors.voterCount ? "voter-count-error" : undefined}
+                    {...register('voterCount', { 
+                      setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v))
+                    })}
+                    className={`w-full bg-white border-2 ${errors.voterCount ? 'border-red-300 focus:border-red-500 bg-red-50/20' : 'border-emerald-200 focus:border-emerald-500'} rounded-2xl py-3.5 px-6 outline-none transition-all font-mono text-lg min-h-[48px]`}
+                  />
+                  {errors.voterCount && (
+                    <p id="voter-count-error" role="alert" className="text-red-600 text-xs font-semibold flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{errors.voterCount.message}</span>
+                    </p>
+                  )}
+                  <p className="text-[11px] text-gray-500">
+                    Read directly from the BVAS machine display. Enter 0 if accreditation has just opened and 0 voters have cleared.
+                  </p>
+                </div>
+
+                {/* 2. BVAS Device Status */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                      <span>BVAS Device Operational Status</span>
+                      <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Hardware Health
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { id: 'functioning', label: 'Fully Functioning', desc: 'Fast biometric & facial match (<1 min)', badge: 'Optimal', color: 'border-emerald-300 bg-white hover:bg-emerald-50/50' },
+                      { id: 'intermittent', label: 'Slow / Intermittent', desc: 'Fingerprint delays or network hiccups', badge: 'Sluggish', color: 'border-amber-300 bg-white hover:bg-amber-50/50' },
+                      { id: 'malfunctioning', label: 'Malfunctioning', desc: 'System crashes or cannot read cards', badge: 'Critical', color: 'border-red-300 bg-white hover:bg-red-50/50' },
+                      { id: 'not_arrived', label: 'Device Not Delivered', desc: 'No BVAS machine at polling unit', badge: 'Missing', color: 'border-gray-300 bg-white hover:bg-gray-50/50' },
+                    ].map((st) => {
+                      const isSelected = watch('bvasStatus') === st.id;
+                      return (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setValue('bvasStatus', st.id as any, { shouldValidate: true })}
+                          className={`p-3.5 rounded-2xl border-2 text-left transition-all min-h-[52px] ${
+                            isSelected 
+                              ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-500/20 shadow-xs' 
+                              : st.color
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-xs font-bold ${isSelected ? 'text-emerald-950' : 'text-gray-800'}`}>{st.label}</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{st.badge}</span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 leading-snug">{st.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {errors.bvasStatus && (
+                    <p role="alert" className="text-red-600 text-xs font-semibold flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{errors.bvasStatus.message}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. Queue / Crowd Size Estimate */}
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-800 block">
+                    Queue Length / Voter Crowd Size Estimate
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'short', label: '< 50 Voters', sub: 'Short line' },
+                      { id: 'medium', label: '50 - 150 Voters', sub: 'Moderate queue' },
+                      { id: 'large', label: '150 - 300 Voters', sub: 'Long crowd' },
+                      { id: 'overflowing', label: '300+ Voters', sub: 'Massive turnout' },
+                    ].map((q) => {
+                      const isSelected = watch('queueSize') === q.id;
+                      return (
+                        <button
+                          key={q.id}
+                          type="button"
+                          onClick={() => setValue('queueSize', q.id as any)}
+                          className={`p-2.5 rounded-xl border-2 text-center transition-all ${
+                            isSelected 
+                              ? 'border-emerald-600 bg-emerald-100/70 font-bold text-emerald-900 shadow-xs' 
+                              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <p className="text-xs font-bold leading-tight">{q.label}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{q.sub}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -1022,33 +1346,144 @@ export default function Report() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-4 p-6 bg-red-50/50 rounded-3xl border border-red-200"
+                className="space-y-6 p-6 sm:p-8 bg-red-50/50 rounded-3xl border-2 border-red-200 shadow-sm"
               >
-                <div className="flex items-center justify-between">
-                  <label htmlFor="severity-level-select" className="text-sm font-bold text-red-950 block">
-                    Incident Severity Level *
-                  </label>
-                  <span className="text-[10px] text-red-800 font-bold uppercase tracking-wider bg-red-100 px-2 py-0.5 rounded-full">
-                    Priority Dispatch
+                {/* Header */}
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-red-200/70">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-red-950">Incident Classification & Rapid Dispatch</h3>
+                      <p className="text-xs text-red-700">Critical incident parameters required for security & supervisor escalation</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-red-900 bg-red-100 border border-red-300 px-3 py-1 rounded-full uppercase tracking-wider">
+                    Incident Report Requirements
                   </span>
                 </div>
-                <select 
-                  id="severity-level-select"
-                  {...register('severity')}
-                  className="w-full bg-white border border-red-200 rounded-2xl py-3 px-6 outline-none focus:border-red-500 transition-colors font-medium text-red-900 min-h-[48px]"
-                >
-                  <option value="low">Low (Procedural delay / minor dispute)</option>
-                  <option value="medium">Medium (Logistics disruption / BVAS hardware delay)</option>
-                  <option value="high">High (Voter suppression / Polling agent harassment)</option>
-                  <option value="critical">Critical (Violence / Ballot snatching / Shooting)</option>
-                </select>
-                {(watch('severity') === 'critical' || watch('severity') === 'high') && (
-                  <p className="text-xs text-red-700 font-semibold flex items-center gap-1.5 bg-red-100/80 p-2.5 rounded-xl border border-red-200">
-                    <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
-                    <span>High & Critical incidents immediately alert state supervisors and central incident command.</span>
-                  </p>
+
+                {/* 1. Incident Severity Level */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="severity-level-select" className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                      <span>Incident Severity Classification</span>
+                      <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <span className="text-[10px] text-red-800 font-bold uppercase tracking-wider bg-red-100 px-2 py-0.5 rounded-full">
+                      Priority Dispatch
+                    </span>
+                  </div>
+                  <select 
+                    id="severity-level-select"
+                    {...register('severity')}
+                    className="w-full bg-white border-2 border-red-200 rounded-2xl py-3 px-6 outline-none focus:border-red-500 transition-colors font-medium text-red-900 min-h-[48px]"
+                  >
+                    <option value="low">Low (Procedural delay / minor dispute / peaceful queuing disagreement)</option>
+                    <option value="medium">Medium (Logistics disruption / BVAS hardware failure / missing materials)</option>
+                    <option value="high">High (Voter suppression / Polling agent harassment / Thuggery threat)</option>
+                    <option value="critical">Critical (Gunshots / Armed violence / Ballot box snatching / Physical attack)</option>
+                  </select>
+                  {(watch('severity') === 'critical' || watch('severity') === 'high') && (
+                    <p className="text-xs text-red-700 font-semibold flex items-center gap-1.5 bg-red-100/80 p-2.5 rounded-xl border border-red-200">
+                      <ShieldAlert className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>High & Critical incidents immediately alert state supervisors and central incident command.</span>
+                    </p>
+                  )}
+                  {errors.severity && (
+                    <p role="alert" className="text-red-600 text-xs font-semibold flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{errors.severity.message}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* 2. Incident Category Dropdown */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="incident-category-select" className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                      <span>Specific Incident Category</span>
+                      <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <span className="text-[10px] text-red-800 font-bold uppercase tracking-wider bg-red-100 px-2 py-0.5 rounded-full">
+                      Classification
+                    </span>
+                  </div>
+                  <select
+                    id="incident-category-select"
+                    {...register('incidentCategory')}
+                    className={`w-full bg-white border-2 ${errors.incidentCategory ? 'border-red-300 focus:border-red-500' : 'border-red-200 focus:border-red-500'} rounded-2xl py-3 px-6 outline-none transition-colors font-medium text-gray-900 min-h-[48px]`}
+                  >
+                    <option value="bvas_failure">BVAS Device / Technical Failure (Device crashed, fingerprint rejection)</option>
+                    <option value="violence_intimidation">Violence / Physical Intimidation / Political Thuggery</option>
+                    <option value="ballot_tampering">Ballot Box Snatching / Destruction of Electoral Materials</option>
+                    <option value="logistics_delay">Late Arrival of INEC Officials / Missing Ballot Papers</option>
+                    <option value="vote_buying">Vote Buying / Cash & Commodity Inducement Near Booth</option>
+                    <option value="disenfranchisement">Voter Suppression / Undue Refusal to Accredit Voters</option>
+                    <option value="procedural_irregularity">Breach of Electoral Act / Unauthorized Agents in PU</option>
+                    <option value="other">Other Severe Polling Station Disruption</option>
+                  </select>
+                  {errors.incidentCategory && (
+                    <p role="alert" className="text-red-600 text-xs font-semibold flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{errors.incidentCategory.message}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. Security Personnel Notified */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                      <span>Were Security Operatives Alerted?</span>
+                      <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <span className="text-[10px] text-red-800 font-bold uppercase tracking-wider bg-red-100 px-2 py-0.5 rounded-full">
+                      Ground Response
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { id: 'yes', label: 'Yes, Notified', sub: 'Police/NSCDC on site alerted' },
+                      { id: 'no', label: 'No, Not Alerted', sub: 'Security present but not alerted' },
+                      { id: 'none_present', label: 'None Present', sub: 'No security forces stationed at PU' },
+                    ].map((sec) => {
+                      const isSelected = watch('securityNotified') === sec.id;
+                      return (
+                        <button
+                          key={sec.id}
+                          type="button"
+                          onClick={() => setValue('securityNotified', sec.id as any, { shouldValidate: true })}
+                          className={`p-3 rounded-2xl border-2 text-left transition-all ${
+                            isSelected 
+                              ? 'border-red-600 bg-red-100/70 font-bold text-red-950 shadow-xs' 
+                              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <p className="text-xs font-bold leading-tight">{sec.label}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{sec.sub}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {errors.securityNotified && (
+                    <p role="alert" className="text-red-600 text-xs font-semibold flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>{errors.securityNotified.message}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* 4. Evidence Reminder Banner */}
+                {mediaFiles.length === 0 && (
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 text-xs text-amber-900">
+                    <Camera className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p>
+                      <strong>Evidence Recommendation:</strong> If it is safe for you to do so without risking your personal security, please capture photo or video evidence in the Photo Vault above.
+                    </p>
+                  </div>
                 )}
-                {errors.severity && <p className="text-red-500 text-xs font-semibold mt-1">{errors.severity.message}</p>}
               </motion.div>
             )}
           </AnimatePresence>

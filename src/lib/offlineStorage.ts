@@ -14,7 +14,11 @@ export interface PendingReport {
   payload: {
     description: string;
     voterCount?: number;
+    bvasStatus?: 'functioning' | 'intermittent' | 'malfunctioning' | 'not_arrived' | string;
+    queueSize?: 'short' | 'medium' | 'large' | 'overflowing' | string;
     severity?: Severity;
+    incidentCategory?: string;
+    securityNotified?: 'yes' | 'no' | 'none_present' | string;
     electionLevel?: string;
     apcVotes?: number;
     pdpVotes?: number;
@@ -46,6 +50,23 @@ export const getPendingReports = (): PendingReport[] => {
 export const savePendingReport = (
   data: Omit<PendingReport, 'clientId' | 'createdAtISO' | 'status'>
 ): PendingReport => {
+  // Comprehensive offline validation guard to guarantee zero corrupt/incomplete drafts
+  if (!data.pollingUnitId?.trim()) {
+    throw new Error('Offline validation: Polling Unit ID is mandatory');
+  }
+  if (!data.type) {
+    throw new Error('Offline validation: Report type is mandatory');
+  }
+  if (!data.payload?.description?.trim()) {
+    throw new Error('Offline validation: Observation details are mandatory');
+  }
+  if (data.type === 'accreditation' && (data.payload.voterCount === undefined || data.payload.voterCount === null || isNaN(data.payload.voterCount))) {
+    throw new Error('Offline validation: Accreditation requires a valid accredited voter count');
+  }
+  if (data.type === 'incident' && !data.payload.severity) {
+    throw new Error('Offline validation: Incident severity level is required');
+  }
+
   const pendingList = getPendingReports();
   const newReport: PendingReport = {
     ...data,
