@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { initializeFirestore, getFirestore } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  getFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
 import defaultConfig from '../../firebase-applet-config.json';
 
 const env = (import.meta as any).env || {};
@@ -25,14 +30,23 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
   console.warn('Firebase Auth persistence setup notice:', err);
 });
 
-// Initialize Firestore with long-polling fallback to support restricted network/iframe environments
+// Initialize Firestore with IndexedDB persistent offline cache & multi-tab coordination
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true
+    experimentalAutoDetectLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
   }, firebaseConfig.firestoreDatabaseId || undefined);
 } catch (e) {
-  firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+  try {
+    firestoreDb = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true
+    }, firebaseConfig.firestoreDatabaseId || undefined);
+  } catch (err) {
+    firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+  }
 }
 export const db = firestoreDb;
 
