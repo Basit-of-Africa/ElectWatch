@@ -36,7 +36,7 @@ import { onSnapshotsInSync } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export default function Layout() {
-  const { user, isAdmin, isSupervisor } = useAuth();
+  const { user, isAdmin, isSupervisor, signOut: logoutUser } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -85,12 +85,7 @@ export default function Layout() {
   ];
 
   const handleSignOut = () => {
-    try {
-      localStorage.removeItem('ivote_authorized_user_session');
-    } catch (e) {
-      // ignore
-    }
-    signOut(auth);
+    logoutUser();
   };
 
   const getRoleLabel = () => {
