@@ -20,15 +20,20 @@ import {
   AlertTriangle, 
   LogOut, 
   Menu, 
-  X,
-  Vote,
-  Map as MapIcon,
-  Wifi,
-  WifiOff,
-  Users,
-  Globe,
-  BookOpen,
-  ShieldCheck
+  X, 
+  Vote, 
+  Map as MapIcon, 
+  Building2,
+  ClipboardList,
+  Paperclip,
+  Bell,
+  Wifi, 
+  WifiOff, 
+  Users, 
+  Globe, 
+  BookOpen, 
+  ShieldCheck,
+  CalendarDays
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -71,18 +76,46 @@ export default function Layout() {
     };
   }, [isMobileMenuOpen, showGuidelinesModal]);
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Public Live Feed', href: '/', icon: Globe },
-    { name: 'Incident Map', href: '/map', icon: MapIcon },
-    // Administrators and field supervisors can access full reports feed and observers roster
-    ...(isAdmin || isSupervisor ? [
-      { name: 'Reports', href: '/reports', icon: FileText },
-      { name: 'Observers', href: '/observers', icon: Users }
-    ] : []),
-    { name: 'Report', href: '/report', icon: FilePlus },
-    { name: 'Incidents', href: '/incidents', icon: AlertTriangle },
+  const navSections = [
+    {
+      title: 'Core Operations',
+      items: [
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, exact: true },
+        { name: 'Election Rounds', href: '/election-rounds', icon: Vote, exact: false },
+        { name: 'Polling Stations', href: '/polling-stations', icon: Building2, match: ['/polling-stations', '/map'] },
+        { name: 'Observers', href: '/observers', icon: Users, exact: false },
+      ]
+    },
+    {
+      title: 'Data & Monitoring',
+      items: [
+        { name: 'Forms', href: '/forms', icon: ClipboardList, match: ['/forms', '/report'] },
+        { name: 'Reports', href: '/reports', icon: FileText, exact: false },
+        { name: 'Incidents', href: '/incidents', icon: AlertTriangle, exact: false },
+        { name: 'Attachments / Evidence', href: '/evidence', icon: Paperclip, match: ['/evidence', '/attachments'] },
+      ]
+    },
+    {
+      title: 'Governance & Alerts',
+      items: [
+        { name: 'Notifications', href: '/notifications', icon: Bell, exact: false },
+        ...(isAdmin || isSupervisor ? [
+          { name: 'Administration', href: '/administration', icon: ShieldCheck, match: ['/administration', '/admin'] }
+        ] : []),
+        { name: 'Public Live Feed', href: '/', icon: Globe, exact: true },
+      ]
+    }
   ];
+
+  const isRouteActive = (item: any) => {
+    if (item.match && Array.isArray(item.match)) {
+      return item.match.some((p: string) => location.pathname.startsWith(p));
+    }
+    if (item.exact) {
+      return location.pathname === item.href;
+    }
+    return location.pathname.startsWith(item.href);
+  };
 
   const handleSignOut = () => {
     logoutUser();
@@ -113,56 +146,68 @@ export default function Layout() {
       {/* Sidebar for Desktop */}
       <aside 
         aria-label="Desktop Sidebar Navigation"
-        className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 sticky top-0 h-screen"
+        className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 sticky top-0 h-screen shrink-0"
       >
-        <div className="p-6 flex items-center gap-3 border-b border-gray-100">
-          <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
+        <div className="p-5 flex items-center gap-3 border-b border-gray-100">
+          <div className="w-10 h-10 bg-emerald-700 rounded-xl flex items-center justify-center shadow-xs">
             <Vote className="text-white w-6 h-6" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="font-bold text-gray-900 leading-none">iVote</h1>
-            <p className="text-xs text-gray-500 mt-1">Election Monitor</p>
+            <h1 className="font-bold text-gray-900 text-base leading-none font-serif">iVote</h1>
+            <p className="text-[11px] text-gray-500 font-medium mt-1">Election Monitor</p>
           </div>
         </div>
 
-        <nav aria-label="Main Navigation" className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                aria-current={isActive ? 'page' : undefined}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 min-h-[44px] ${
-                  isActive 
-                    ? 'bg-emerald-50 text-emerald-700 font-bold shadow-sm' 
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
-                }`}
-              >
-                <item.icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-emerald-600' : ''}`} aria-hidden="true" />
-                <span>{item.name}</span>
-              </Link>
-            );
-          })}
+        <nav aria-label="Main Navigation" className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 font-sans">
+                {section.title}
+              </p>
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const isActive = isRouteActive(item);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 min-h-[40px] group ${
+                        isActive 
+                          ? 'bg-emerald-50 text-emerald-900 font-bold border-l-3 border-emerald-600 pl-2.5' 
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <Icon 
+                        className={`w-4 h-4 shrink-0 transition-colors ${
+                          isActive ? 'text-emerald-700' : 'text-gray-400 group-hover:text-gray-600'
+                        }`} 
+                        aria-hidden="true" 
+                      />
+                      <span className="truncate">{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="p-4 border-t border-gray-100">
-          <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-2">
+          <div className="bg-gray-50 rounded-2xl p-3.5 mb-3 space-y-1.5">
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Account</p>
-              <p className="text-sm font-medium text-gray-900 mt-1 truncate">{user?.displayName}</p>
-              <p className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full inline-block mt-1 uppercase tracking-wider border ${getRoleBadgeClasses()}`}>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active Account</p>
+              <p className="text-xs font-bold text-gray-900 mt-0.5 truncate">{user?.displayName || user?.email}</p>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 uppercase tracking-wider border ${getRoleBadgeClasses()}`}>
                 {getRoleLabel()}
-              </p>
-            </div>
-            <div className="pt-2 border-t border-gray-200/60">
-              <InstallPWAButton className="w-full justify-center" />
+              </span>
             </div>
           </div>
           <button
             onClick={handleSignOut}
             aria-label="Sign out of your account"
-            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium text-sm min-h-[44px] cursor-pointer"
+            className="flex items-center gap-2.5 w-full px-3 py-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors font-bold text-xs cursor-pointer"
           >
             <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>Sign Out</span>
@@ -174,7 +219,7 @@ export default function Layout() {
       <div className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <Vote className="text-emerald-600 w-6 h-6" aria-hidden="true" />
-          <span className="font-bold text-gray-900 tracking-tight text-lg">iVote</span>
+          <span className="font-bold text-gray-900 tracking-tight text-lg font-serif">iVote</span>
         </div>
         <div className="flex items-center gap-2">
           <DangerButton variant="compact" />
@@ -204,46 +249,56 @@ export default function Layout() {
             exit={{ opacity: 0, y: -20 }}
             className="md:hidden fixed inset-0 z-40 pt-20 bg-white overflow-y-auto"
           >
-            <nav aria-label="Mobile Main Navigation" className="p-6 space-y-2">
-              <div className="pb-2">
-                <InstallPWAButton className="w-full justify-center py-3 text-sm min-h-[44px]" />
+            <nav aria-label="Mobile Main Navigation" className="p-6 space-y-4">
+              {navSections.map((section) => (
+                <div key={section.title}>
+                  <p className="px-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    {section.title}
+                  </p>
+                  <div className="space-y-1">
+                    {section.items.map((item) => {
+                      const isActive = isRouteActive(item);
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={`flex items-center gap-3.5 p-3 rounded-xl text-sm font-semibold transition-colors ${
+                            isActive ? 'bg-emerald-50 text-emerald-900 font-bold border-l-3 border-emerald-600' : 'text-gray-800 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-emerald-700' : 'text-gray-400'}`} aria-hidden="true" />
+                          <span>{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <div className="pt-4 border-t border-gray-100 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setShowGuidelinesModal(true);
+                  }}
+                  className="flex items-center gap-3.5 p-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 rounded-xl w-full text-left cursor-pointer"
+                >
+                  <BookOpen className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
+                  <span>Code of Conduct & Guidelines</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3.5 p-3 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-xl w-full text-left cursor-pointer"
+                >
+                  <LogOut className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span>Sign Out</span>
+                </button>
               </div>
-              {navigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`flex items-center gap-4 p-4 text-base font-semibold rounded-2xl min-h-[48px] transition-colors ${
-                      isActive ? 'bg-emerald-50 text-emerald-800' : 'text-gray-900 hover:bg-gray-50'
-                    }`}
-                  >
-                    <item.icon className="w-6 h-6 text-emerald-600 shrink-0" aria-hidden="true" />
-                    <span>{item.name}</span>
-                  </Link>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  setShowGuidelinesModal(true);
-                }}
-                className="flex items-center gap-4 p-4 text-base font-semibold text-emerald-800 hover:bg-emerald-50 rounded-2xl w-full text-left cursor-pointer min-h-[48px]"
-              >
-                <BookOpen className="w-6 h-6 text-emerald-600 shrink-0" aria-hidden="true" />
-                <span>Code of Conduct & Guidelines</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="flex items-center gap-4 p-4 text-base font-semibold text-red-600 hover:bg-red-50 rounded-2xl w-full text-left cursor-pointer min-h-[48px]"
-              >
-                <LogOut className="w-6 h-6 shrink-0" aria-hidden="true" />
-                <span>Sign Out</span>
-              </button>
             </nav>
           </motion.div>
         )}
@@ -290,7 +345,6 @@ export default function Layout() {
              </button>
              <ElectionScopeSelector compact />
              <PushNotificationPrompt compact />
-             <InstallPWAButton />
              <DangerButton variant="header" />
              <div className="h-8 w-px bg-gray-100 mx-1" />
              <NotificationCenter />
