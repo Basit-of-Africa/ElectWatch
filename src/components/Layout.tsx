@@ -14,7 +14,7 @@ import ObserverOnboarding from './ObserverOnboarding';
 import PushNotificationPrompt from './PushNotificationPrompt';
 import ObserverFAB from './ObserverFAB';
 import { 
-  LayoutDashboard, 
+  LayoutGrid, 
   FileText, 
   FilePlus,
   AlertTriangle, 
@@ -80,7 +80,7 @@ export default function Layout() {
     {
       title: 'Core Operations',
       items: [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, exact: true },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutGrid, exact: true },
         { name: 'Election Rounds', href: '/election-rounds', icon: Vote, exact: false },
         { name: 'Polling Stations', href: '/polling-stations', icon: Building2, match: ['/polling-stations', '/map'] },
         { name: 'Observers', href: '/observers', icon: Users, exact: false },
@@ -173,15 +173,15 @@ export default function Layout() {
                       key={item.name}
                       to={item.href}
                       aria-current={isActive ? 'page' : undefined}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 min-h-[40px] group ${
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-full text-xs font-semibold transition-all duration-150 min-h-[40px] group ${
                         isActive 
-                          ? 'bg-emerald-50 text-emerald-900 font-bold border-l-3 border-emerald-600 pl-2.5' 
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          ? 'bg-[#f0f4ff] text-[#1e2246] border border-[#c7d7fe] shadow-xs' 
+                          : 'text-gray-600 hover:bg-gray-100/70 hover:text-gray-900 border border-transparent font-medium'
                       }`}
                     >
                       <Icon 
                         className={`w-4 h-4 shrink-0 transition-colors ${
-                          isActive ? 'text-emerald-700' : 'text-gray-400 group-hover:text-gray-600'
+                          isActive ? 'text-[#1e2246]' : 'text-gray-400 group-hover:text-gray-600'
                         }`} 
                         aria-hidden="true" 
                       />
@@ -265,11 +265,13 @@ export default function Layout() {
                           to={item.href}
                           onClick={() => setIsMobileMenuOpen(false)}
                           aria-current={isActive ? 'page' : undefined}
-                          className={`flex items-center gap-3.5 p-3 rounded-xl text-sm font-semibold transition-colors ${
-                            isActive ? 'bg-emerald-50 text-emerald-900 font-bold border-l-3 border-emerald-600' : 'text-gray-800 hover:bg-gray-50'
+                          className={`flex items-center gap-3.5 px-4 py-3 rounded-full text-sm font-semibold transition-colors ${
+                            isActive 
+                              ? 'bg-[#f0f4ff] text-[#1e2246] border border-[#c7d7fe] shadow-xs' 
+                              : 'text-gray-800 hover:bg-gray-100/70 border border-transparent font-medium'
                           }`}
                         >
-                          <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-emerald-700' : 'text-gray-400'}`} aria-hidden="true" />
+                          <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#1e2246]' : 'text-gray-400'}`} aria-hidden="true" />
                           <span>{item.name}</span>
                         </Link>
                       );
