@@ -360,20 +360,6 @@ export default function Dashboard() {
                 <span>Directive</span>
               </button>
 
-              {(isAdmin || isSupervisor) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEmergencyBroadcast(true);
-                    setShowBroadcastModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer min-h-[38px]"
-                >
-                  <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Emergency</span>
-                </button>
-              )}
-
               <button
                 type="button"
                 onClick={exportIncidentsCSV}
