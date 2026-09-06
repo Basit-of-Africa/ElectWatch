@@ -320,70 +320,74 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* 1. Concise Page Header with Election Context & Synchronization Controls */}
-      <PageHeader
-        title={isAdmin ? 'National Command Center' : isSupervisor ? 'Regional Operations Hub' : 'Field Observer Dashboard'}
-        subtitle="Osun State Off-Cycle Gubernatorial Election 2026 • General Accreditation & Balloting Cycle"
-        badge={
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 text-emerald-800 rounded-full text-xs font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>LIVE TELEMETRY</span>
+      <div className="pb-6 border-b border-gray-200/80 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight font-serif">
+                {isAdmin ? 'National Command Center' : isSupervisor ? 'Regional Operations Hub' : 'Field Observer Dashboard'}
+              </h1>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                Voting Active • Election Day
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 font-medium max-w-3xl leading-relaxed">
+              Live monitoring for Osun State Off-Cycle Gubernatorial Election (Osun State, 30 LGAs).
+            </p>
           </div>
-        }
-        actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Countdown / Sync control */}
-            <AutoRefreshControl
-              secondsRemaining={secondsRemaining}
-              isAutoRefreshEnabled={isAutoRefreshEnabled}
-              onToggleAutoRefresh={() => setIsAutoRefreshEnabled(!isAutoRefreshEnabled)}
-              onManualRefresh={() => refreshElectionStatistics(true)}
-              isRefreshing={isRefreshing}
-              lastRefreshedAt={lastRefreshedAt}
-            />
 
-            {/* Admin Emergency & Broadcast controls */}
-            {(isAdmin || isSupervisor) && (
-              <>
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => refreshElectionStatistics(true)}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl border border-gray-200 shadow-xs transition-colors cursor-pointer min-h-[38px] disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                <span>{isRefreshing ? 'Refreshing...' : `Refresh (${secondsRemaining}s)`}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEmergencyBroadcast(false);
+                  setShowBroadcastModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer min-h-[38px]"
+              >
+                <Radio className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Directive</span>
+              </button>
+
+              {(isAdmin || isSupervisor) && (
                 <button
                   type="button"
                   onClick={() => {
                     setIsEmergencyBroadcast(true);
                     setShowBroadcastModal(true);
                   }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer min-h-[38px]"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer min-h-[38px]"
                 >
-                  <ShieldAlert className="w-3.5 h-3.5 animate-pulse" />
-                  <span>Declare Emergency</span>
+                  <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Emergency</span>
                 </button>
+              )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEmergencyBroadcast(false);
-                    setShowBroadcastModal(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#141A56] hover:bg-[#1f2873] text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer min-h-[38px]"
-                >
-                  <Radio className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Broadcast Directive</span>
-                </button>
-              </>
-            )}
-
-            {/* Export CSV */}
-            <button
-              type="button"
-              onClick={exportIncidentsCSV}
-              disabled={isExportingCSV}
-              aria-label="Export Incidents CSV"
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-semibold shadow-xs transition-colors min-h-[38px]"
-            >
-              <Download className="w-3.5 h-3.5 text-gray-500" />
-              <span>{isExportingCSV ? 'Exporting...' : 'Export CSV'}</span>
-            </button>
+              <button
+                type="button"
+                onClick={exportIncidentsCSV}
+                disabled={isExportingCSV}
+                aria-label="Export Incidents CSV"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-xl border border-gray-200 shadow-xs transition-colors cursor-pointer min-h-[38px] disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5 text-gray-500" aria-hidden="true" />
+                <span>{isExportingCSV ? 'Exporting...' : 'Export'}</span>
+              </button>
+            </div>
           </div>
-        }
-      />
+        </div>
+      </div>
 
       {/* Osun Countdown & Official Scope Banner */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
