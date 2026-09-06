@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStoredThresholdConfig } from '../lib/incidentAlertService';
-import { savePendingReport } from '../lib/offlineStorage';
+import { savePendingReport, getIsOnline } from '../lib/offlineStorage';
+import { toast } from 'sonner';
 import { Severity } from '../types';
 import { 
   Send, 
@@ -432,7 +433,7 @@ export default function Report() {
       cleanPayload.totalVotes = apc + pdp + lp + nnpp + other;
     }
 
-    const isCurrentlyOffline = !navigator.onLine;
+    const isCurrentlyOffline = !getIsOnline();
 
     if (isCurrentlyOffline) {
       savePendingReport({
@@ -442,6 +443,12 @@ export default function Report() {
         location: taggedLocation,
         media: mediaFiles.map(m => ({ url: m.url, type: m.type, hash: m.hash || '' })),
         payload: cleanPayload,
+      });
+
+      const queuedTypeLabel = data.type === 'incident' ? 'Incident Report' : 'Observer Report';
+      toast.warning(`${queuedTypeLabel} Queued Locally (Offline Mode)`, {
+        description: `Your ${queuedTypeLabel.toLowerCase()} for PU #${data.pollingUnitId.trim()} is securely cached. It will automatically synchronize to Election HQ the instant connectivity is restored.`,
+        duration: 6000
       });
 
       setOfflineNotice('Report validated & safely stored in local offline vault! All critical metrics were captured and will auto-sync when network returns.');

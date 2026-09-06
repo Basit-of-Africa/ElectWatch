@@ -4,7 +4,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Incident, IncidentAlertThresholdConfig } from '../types';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { cacheFetchedIncidents, getCachedIncidents } from '../lib/offlineStorage';
+import { cacheFetchedIncidents, getCachedIncidents, getQueuedIncidents, getIsOnline, syncPendingReports, PendingReport } from '../lib/offlineStorage';
 import { logAuditEvent } from '../lib/audit';
 import AuditTrailModal from '../components/AuditTrailModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
@@ -34,7 +34,11 @@ import {
   Sliders,
   BellRing,
   Flame,
-  Zap
+  Zap,
+  WifiOff,
+  Wifi,
+  HardDrive,
+  RefreshCw
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -60,7 +64,12 @@ export default function Incidents() {
   const [thresholdConfig, setThresholdConfig] = useState<IncidentAlertThresholdConfig>(getStoredThresholdConfig());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Sync threshold config & acknowledged breaches across events
+  // Offline Queued Incidents State
+  const [queuedIncidents, setQueuedIncidents] = useState<PendingReport[]>(getQueuedIncidents);
+  const [isOnline, setIsOnline] = useState(getIsOnline);
+  const [isSyncingQueued, setIsSyncingQueued] = useState(false);
+
+  // Sync threshold config & offline queue updates
   useEffect(() => {
     const handleConfigUpdate = () => {
       setThresholdConfig(getStoredThresholdConfig());
@@ -69,14 +78,44 @@ export default function Incidents() {
     const handleAckUpdate = () => {
       setRefreshTrigger(prev => prev + 1);
     };
+    const handleQueueChange = () => {
+      setQueuedIncidents(getQueuedIncidents());
+      setIsOnline(getIsOnline());
+    };
 
     window.addEventListener('incident-threshold-config-updated', handleConfigUpdate);
     window.addEventListener('incident-threshold-ack-updated', handleAckUpdate);
+    window.addEventListener('ivote_pending_reports_updated', handleQueueChange);
+    window.addEventListener('ivote_network_status_change', handleQueueChange);
+    window.addEventListener('online', handleQueueChange);
+    window.addEventListener('offline', handleQueueChange);
+
     return () => {
       window.removeEventListener('incident-threshold-config-updated', handleConfigUpdate);
       window.removeEventListener('incident-threshold-ack-updated', handleAckUpdate);
+      window.removeEventListener('ivote_pending_reports_updated', handleQueueChange);
+      window.removeEventListener('ivote_network_status_change', handleQueueChange);
+      window.removeEventListener('online', handleQueueChange);
+      window.removeEventListener('offline', handleQueueChange);
     };
   }, []);
+
+  const handleSyncQueuedIncidents = async () => {
+    setIsSyncingQueued(true);
+    try {
+      const res = await syncPendingReports();
+      setQueuedIncidents(getQueuedIncidents());
+      if (res.incidentCount > 0) {
+        toast.success(`Successfully synchronized ${res.incidentCount} queued incident report(s)!`);
+      } else if (res.successCount > 0) {
+        toast.success(`Synchronized ${res.successCount} offline report(s)!`);
+      }
+    } catch (err) {
+      toast.error('Failed to synchronize queued incidents.');
+    } finally {
+      setIsSyncingQueued(false);
+    }
+  };
 
   // Live evaluation of threshold breaches
   const { breaches } = useMemo(() => {
@@ -458,6 +497,68 @@ export default function Incidents() {
               >
                 Clear Filter
               </button>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Offline Queued Incident Reports Alert */}
+      {queuedIncidents.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-5 rounded-3xl bg-amber-50 border border-amber-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
+          <div className="flex items-start gap-3.5">
+            <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-800 shrink-0">
+              <HardDrive className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-amber-950 text-base">
+                  {queuedIncidents.length} Offline Incident Report{queuedIncidents.length > 1 ? 's' : ''} Queued Locally
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-200 text-amber-900 border border-amber-300">
+                  {isOnline ? 'Ready to Sync' : 'Awaiting Connection'}
+                </span>
+              </div>
+              <p className="text-sm text-amber-800/90 mt-1 leading-relaxed">
+                {isOnline 
+                  ? 'Internet connection is active. These incidents are securely staged on this device and can be synced immediately or will auto-sync.'
+                  : 'You are working offline. These incidents are safely stored in your device\'s local storage and will automatically upload once connectivity is restored.'}
+              </p>
+              
+              {/* Pill list of queued polling units */}
+              <div className="flex items-center gap-2 flex-wrap mt-2.5">
+                {queuedIncidents.map((q) => (
+                  <span
+                    key={q.clientId}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-amber-200 text-xs font-mono font-medium text-amber-900 shadow-xs"
+                  >
+                    <span>PU #{q.pollingUnitId}</span>
+                    <span className="text-[10px] uppercase font-bold text-amber-700">({q.payload.severity || 'med'})</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+            {isOnline ? (
+              <button
+                type="button"
+                onClick={handleSyncQueuedIncidents}
+                disabled={isSyncingQueued}
+                className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-2xl text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isSyncingQueued ? 'animate-spin' : ''}`} />
+                <span>{isSyncingQueued ? 'Synchronizing...' : 'Sync Queued Now'}</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-800 bg-amber-100 px-3 py-2 rounded-2xl border border-amber-200">
+                <WifiOff className="w-4 h-4 text-amber-600 animate-pulse" />
+                <span>Auto-sync enabled</span>
+              </div>
             )}
           </div>
         </motion.div>

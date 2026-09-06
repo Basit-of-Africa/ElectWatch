@@ -39,20 +39,27 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { onSnapshotsInSync } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { getIsOnline } from '../lib/offlineStorage';
 
 export default function Layout() {
   const { user, isAdmin, isSupervisor, signOut: logoutUser } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(getIsOnline);
   const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
+    const handleOnline = () => setIsOnline(getIsOnline());
     const handleOffline = () => setIsOnline(false);
+    const handleNetworkChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ isOnline: boolean }>;
+      setIsOnline(customEvent.detail?.isOnline ?? getIsOnline());
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('ivote_network_status_change', handleNetworkChange);
 
     // Escape key listener for accessible modal / mobile menu dismiss
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -71,6 +78,7 @@ export default function Layout() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('ivote_network_status_change', handleNetworkChange);
       window.removeEventListener('keydown', handleKeyDown);
       unsubscribeSync();
     };

@@ -32,10 +32,51 @@ export interface PendingReport {
   errorMessage?: string;
 }
 
+export interface OfflineSyncResult {
+  successCount: number;
+  failedCount: number;
+  totalCount: number;
+  incidentCount: number;
+  syncedIncidents: Array<{ clientId: string; pollingUnitId: string; description: string; severity?: string }>;
+  error?: string;
+}
+
 const PENDING_REPORTS_KEY = 'votemonitor_offline_pending_reports';
 const CACHED_REPORTS_KEY = 'votemonitor_cached_reports';
 const CACHED_INCIDENTS_KEY = 'votemonitor_cached_incidents';
 const LAST_SYNC_KEY = 'votemonitor_last_sync_timestamp';
+const SIMULATED_OFFLINE_KEY = 'ivote_simulated_offline';
+
+/**
+ * Returns true if the client has active internet connectivity AND simulated offline mode is inactive
+ */
+export const getIsOnline = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const isSimulated = localStorage.getItem(SIMULATED_OFFLINE_KEY) === 'true';
+  if (isSimulated) return false;
+  return navigator.onLine;
+};
+
+/**
+ * Toggles simulated offline mode for field observer training, testing, and demonstration
+ */
+export const setSimulatedOffline = (offline: boolean) => {
+  if (typeof window === 'undefined') return;
+  if (offline) {
+    localStorage.setItem(SIMULATED_OFFLINE_KEY, 'true');
+  } else {
+    localStorage.removeItem(SIMULATED_OFFLINE_KEY);
+  }
+  window.dispatchEvent(new CustomEvent('ivote_network_status_change', {
+    detail: { isOnline: !offline, isSimulated: true }
+  }));
+  window.dispatchEvent(new Event(offline ? 'offline' : 'online'));
+};
+
+export const isSimulationActive = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(SIMULATED_OFFLINE_KEY) === 'true';
+};
 
 export const getPendingReports = (): PendingReport[] => {
   try {
@@ -45,6 +86,13 @@ export const getPendingReports = (): PendingReport[] => {
     console.error('Failed to read pending reports from localStorage', err);
     return [];
   }
+};
+
+/**
+ * Convenience helper returning only queued incident reports
+ */
+export const getQueuedIncidents = (): PendingReport[] => {
+  return getPendingReports().filter(r => r.type === 'incident');
 };
 
 export const savePendingReport = (
@@ -170,10 +218,10 @@ export const getLastSyncTime = (): string | null => {
   return localStorage.getItem(LAST_SYNC_KEY);
 };
 
-export const syncPendingReports = async (overrideObserverId?: string) => {
+export const syncPendingReports = async (overrideObserverId?: string): Promise<OfflineSyncResult> => {
   const pending = getPendingReports();
   if (pending.length === 0) {
-    return { successCount: 0, failedCount: 0, totalCount: 0 };
+    return { successCount: 0, failedCount: 0, totalCount: 0, incidentCount: 0, syncedIncidents: [] };
   }
 
   // Use authenticated user UID to satisfy Firestore Security Rules (request.auth.uid == data.observerId)
@@ -184,12 +232,16 @@ export const syncPendingReports = async (overrideObserverId?: string) => {
       successCount: 0, 
       failedCount: pending.length, 
       totalCount: pending.length,
+      incidentCount: 0,
+      syncedIncidents: [],
       error: 'User not signed in. Please sign in to sync offline drafts.'
     };
   }
 
   let successCount = 0;
   let failedCount = 0;
+  let incidentCount = 0;
+  const syncedIncidents: Array<{ clientId: string; pollingUnitId: string; description: string; severity?: string }> = [];
 
   for (const item of pending) {
     updatePendingReportStatus(item.clientId, 'syncing');
@@ -216,6 +268,14 @@ export const syncPendingReports = async (overrideObserverId?: string) => {
           status: 'pending',
           description: item.payload?.description || 'Incident reported by field observer',
           timestamp: serverTimestamp(),
+        });
+
+        incidentCount++;
+        syncedIncidents.push({
+          clientId: item.clientId,
+          pollingUnitId: item.pollingUnitId,
+          description: item.payload?.description || 'Incident reported by field observer',
+          severity: item.payload?.severity
         });
 
         if (item.payload?.severity === 'critical' || item.payload?.severity === 'high') {
@@ -254,10 +314,13 @@ export const syncPendingReports = async (overrideObserverId?: string) => {
   }
 
   localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+  window.dispatchEvent(new Event('ivote_pending_reports_updated'));
 
   return {
     successCount,
     failedCount,
     totalCount: pending.length,
+    incidentCount,
+    syncedIncidents,
   };
 };
