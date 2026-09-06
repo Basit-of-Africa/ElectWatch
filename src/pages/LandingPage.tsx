@@ -707,15 +707,15 @@ export default function LandingPage() {
                 Report Category Distribution
               </h3>
 
-              <div className="h-48 w-full relative flex items-center justify-center">
+              <div className="w-full relative aspect-[4/3] sm:aspect-[16/10] md:aspect-square max-h-52 flex items-center justify-center py-1">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+                  <PieChart margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
                     <Pie
                       data={categoryData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={75}
+                      innerRadius="50%"
+                      outerRadius="75%"
                       paddingAngle={4}
                       dataKey="value"
                     >
@@ -784,9 +784,9 @@ export default function LandingPage() {
                 Security Assessment
               </h3>
 
-              <div className="h-40 w-full">
+              <div className="w-full relative min-h-[160px] aspect-[16/10] sm:aspect-[2/1] max-h-52 my-1">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={securityChartData}>
+                  <BarChart data={securityChartData} margin={{ top: 4, right: 10, left: -20, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip />

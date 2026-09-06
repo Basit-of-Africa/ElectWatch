@@ -315,61 +315,64 @@ export default function PollingStationCoverageChart({
       </div>
 
       {/* Main Visualizations Area */}
-      <div className={`grid gap-6 items-center ${
+      <div className={`grid gap-4 sm:gap-5 lg:gap-6 items-stretch ${
         activeTab === 'dual' ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'
       }`}>
         
         {/* Visual 1: Donut Chart with Center Percentage */}
         {(activeTab === 'dual' || activeTab === 'donut') && (
-          <div className={`${activeTab === 'dual' ? 'lg:col-span-5' : 'max-w-xl mx-auto w-full'} flex flex-col items-center justify-center p-4 bg-gray-50/60 rounded-2xl border border-gray-100`}>
-            <div className="w-full flex items-center justify-between mb-2">
+          <div className={`${activeTab === 'dual' ? 'lg:col-span-5' : 'max-w-xl mx-auto w-full'} flex flex-col items-center justify-between p-3.5 sm:p-4 md:p-5 bg-gray-50/60 rounded-2xl border border-gray-100`}>
+            <div className="w-full flex items-center justify-between mb-1 sm:mb-2">
               <span className="text-xs font-bold text-gray-700 font-serif">Observer Deployment Ratio</span>
               <span className="text-[11px] text-gray-400 font-mono">Real-time</span>
             </div>
 
-            <div className="relative w-full h-56 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={65}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any, name: any) => [`${value} PUs (${Math.round((Number(value) / totalAccredited) * 100)}%)`, name]}
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderRadius: '12px',
-                      border: '1px solid #e2e8f0',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-                      fontSize: '12px',
-                      fontWeight: 600
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            {/* Responsive Donut Container maintaining square aspect-ratio across mobile, tablet, and desktop */}
+            <div className="w-full flex items-center justify-center py-2 sm:py-3">
+              <div className="relative w-full aspect-square max-w-[230px] sm:max-w-[260px] md:max-w-[280px] lg:max-w-[250px] xl:max-w-[280px] flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="64%"
+                      outerRadius="88%"
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: any, name: any) => [`${value} PUs (${Math.round((Number(value) / totalAccredited) * 100)}%)`, name]}
+                      contentStyle={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                        fontSize: '12px',
+                        fontWeight: 600
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
 
-              {/* Center Metrics in Donut */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                <span className="text-3xl font-extrabold text-gray-900 font-sans tracking-tight">
-                  {coveragePercentage}%
-                </span>
-                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mt-0.5">
-                  Manned PUs
-                </span>
+                {/* Center Metrics in Donut */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                  <span className="text-2xl sm:text-3xl font-extrabold text-gray-900 font-sans tracking-tight">
+                    {coveragePercentage}%
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mt-0.5">
+                    Manned PUs
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Custom Legend */}
-            <div className="w-full space-y-1.5 mt-3 pt-3 border-t border-gray-200/60 text-xs">
+            <div className="w-full space-y-1.5 mt-2 pt-3 border-t border-gray-200/60 text-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
@@ -397,8 +400,8 @@ export default function PollingStationCoverageChart({
 
         {/* Visual 2: Regional Bar Chart across LGAs */}
         {(activeTab === 'dual' || activeTab === 'bars') && (
-          <div className={`${activeTab === 'dual' ? 'lg:col-span-7' : 'w-full'} flex flex-col p-4 bg-gray-50/60 rounded-2xl border border-gray-100`}>
-            <div className="flex items-center justify-between mb-2">
+          <div className={`${activeTab === 'dual' ? 'lg:col-span-7' : 'w-full'} flex flex-col justify-between p-3.5 sm:p-4 md:p-5 bg-gray-50/60 rounded-2xl border border-gray-100`}>
+            <div className="flex items-center justify-between mb-1 sm:mb-2">
               <div>
                 <span className="text-xs font-bold text-gray-700 font-serif">Coverage by Local Government Area (LGA)</span>
                 <p className="text-[11px] text-gray-500">Percentage of accredited units with active observer deployment</p>
@@ -408,12 +411,13 @@ export default function PollingStationCoverageChart({
               </span>
             </div>
 
-            <div className="w-full h-64 mt-2">
-              <ResponsiveContainer width="100%" height={250}>
+            {/* Responsive Bar Chart Container maintaining aspect ratio, minimum heights, and adaptive spacing across screen breakpoints */}
+            <div className="w-full relative min-h-[250px] sm:min-h-[270px] md:min-h-[290px] aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] max-h-[340px] my-1 sm:my-2">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={lgaData}
                   layout="vertical"
-                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                  margin={{ top: 6, right: 20, left: 0, bottom: 4 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                   <XAxis 
@@ -426,7 +430,7 @@ export default function PollingStationCoverageChart({
                   <YAxis 
                     dataKey="lga" 
                     type="category" 
-                    width={80}
+                    width={78}
                     tick={{ fontSize: 11, fill: '#374151', fontWeight: 600 }}
                     stroke="#9ca3af"
                   />
