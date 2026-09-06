@@ -51,6 +51,7 @@ import DirectiveBroadcastModal from '../components/DirectiveBroadcastModal';
 import HQDirectivesFeed from '../components/HQDirectivesFeed';
 import AutoRefreshControl from '../components/AutoRefreshControl';
 import OsunCountdown from '../components/OsunCountdown';
+import PollingStationCoverageChart from '../components/dashboard/PollingStationCoverageChart';
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -460,7 +461,12 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* 3. Prominent Quick-Actions Area */}
+      {/* 3. Recharts Data Visualization: Accredited Polling Stations with Active Observers */}
+      <section aria-label="Polling Station Observer Coverage Visualization">
+        <PollingStationCoverageChart reports={reports} users={users} incidents={incidents} />
+      </section>
+
+      {/* 4. Prominent Quick-Actions Area */}
       <QuickActions
         onCheckIn={!isCurrentUserCheckedIn ? () => {
           const el = document.getElementById('observer-checkin-section');
@@ -468,7 +474,7 @@ export default function Dashboard() {
         } : undefined}
       />
 
-      {/* 4. Structured Administrative 2-Column Information Layout */}
+      {/* 5. Structured Administrative 2-Column Information Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Incident Summary & Observer Attendance (7 cols on lg) */}
         <div className="lg:col-span-7 space-y-6">
