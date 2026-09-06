@@ -52,6 +52,7 @@ import HQDirectivesFeed from '../components/HQDirectivesFeed';
 import AutoRefreshControl from '../components/AutoRefreshControl';
 import OsunCountdown from '../components/OsunCountdown';
 import PollingStationCoverageChart from '../components/dashboard/PollingStationCoverageChart';
+import IncidentHourlyTrendChart from '../components/dashboard/IncidentHourlyTrendChart';
 
 export default function Dashboard() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -466,7 +467,12 @@ export default function Dashboard() {
         <PollingStationCoverageChart reports={reports} users={users} incidents={incidents} />
       </section>
 
-      {/* 4. Prominent Quick-Actions Area */}
+      {/* 4. Temporal Trend Line Chart: Hourly Incoming Incident Reports Throughout Election Day */}
+      <section aria-label="Hourly Incident Reports Trend Throughout Election Day">
+        <IncidentHourlyTrendChart incidents={incidents} />
+      </section>
+
+      {/* 5. Prominent Quick-Actions Area */}
       <QuickActions
         onCheckIn={!isCurrentUserCheckedIn ? () => {
           const el = document.getElementById('observer-checkin-section');

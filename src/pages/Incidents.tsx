@@ -1,13 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Incident } from '../types';
+import { Incident, IncidentAlertThresholdConfig } from '../types';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { cacheFetchedIncidents, getCachedIncidents } from '../lib/offlineStorage';
 import { logAuditEvent } from '../lib/audit';
 import AuditTrailModal from '../components/AuditTrailModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import IncidentThresholdModal from '../components/IncidentThresholdModal';
+import { 
+  getStoredThresholdConfig, 
+  evaluateIncidentThresholds, 
+  dispatchAutomatedThresholdAlerts,
+  acknowledgeBreach,
+  clearAcknowledgedBreach
+} from '../lib/incidentAlertService';
 import { 
   AlertTriangle, 
   Clock, 
@@ -22,7 +30,11 @@ import {
   Table as TableIcon,
   Camera,
   Trash2,
-  History
+  History,
+  Sliders,
+  BellRing,
+  Flame,
+  Zap
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -42,6 +54,49 @@ export default function Incidents() {
   // Audit Trail & Deletion Modal states
   const [isAuditTrailOpen, setIsAuditTrailOpen] = useState(false);
   const [incidentToDelete, setIncidentToDelete] = useState<Incident | null>(null);
+
+  // Automated Alert Thresholds state
+  const [isThresholdModalOpen, setIsThresholdModalOpen] = useState(false);
+  const [thresholdConfig, setThresholdConfig] = useState<IncidentAlertThresholdConfig>(getStoredThresholdConfig());
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Sync threshold config & acknowledged breaches across events
+  useEffect(() => {
+    const handleConfigUpdate = () => {
+      setThresholdConfig(getStoredThresholdConfig());
+      setRefreshTrigger(prev => prev + 1);
+    };
+    const handleAckUpdate = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+
+    window.addEventListener('incident-threshold-config-updated', handleConfigUpdate);
+    window.addEventListener('incident-threshold-ack-updated', handleAckUpdate);
+    return () => {
+      window.removeEventListener('incident-threshold-config-updated', handleConfigUpdate);
+      window.removeEventListener('incident-threshold-ack-updated', handleAckUpdate);
+    };
+  }, []);
+
+  // Live evaluation of threshold breaches
+  const { breaches } = useMemo(() => {
+    return evaluateIncidentThresholds(incidents, thresholdConfig);
+  }, [incidents, thresholdConfig, refreshTrigger]);
+
+  const puBreachMap = useMemo(() => {
+    return new Map(breaches.map(b => [b.pollingUnitId, b]));
+  }, [breaches]);
+
+  const unacknowledgedBreaches = useMemo(() => {
+    return breaches.filter(b => !b.acknowledged);
+  }, [breaches]);
+
+  // Automated notification dispatcher
+  useEffect(() => {
+    if (incidents.length > 0 && thresholdConfig.enabled && breaches.length > 0) {
+      dispatchAutomatedThresholdAlerts(breaches, thresholdConfig);
+    }
+  }, [breaches, thresholdConfig]);
 
   const exportToCSV = () => {
     const headers = ['ID', 'Polling Unit', 'Severity', 'Status', 'Description', 'Timestamp'];
@@ -212,6 +267,25 @@ export default function Incidents() {
         </div>
         
         <div className="flex flex-col md:flex-row xl:flex-row xl:items-center gap-4 w-full xl:w-auto">
+          {/* Alert Thresholds Configuration Button */}
+          <button
+            onClick={() => setIsThresholdModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 rounded-2xl shadow-sm text-sm font-bold transition-all cursor-pointer shrink-0 relative group"
+            title="Configure Automated Incident Alert Trigger Thresholds"
+          >
+            <Sliders className="w-4 h-4 text-emerald-600 group-hover:rotate-45 transition-transform" />
+            <span>Alert Thresholds</span>
+            {thresholdConfig.enabled && breaches.length > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                unacknowledgedBreaches.length > 0 
+                  ? 'bg-red-600 text-white animate-pulse' 
+                  : 'bg-amber-100 text-amber-800 border border-amber-300'
+              }`}>
+                {breaches.length} {breaches.length === 1 ? 'Hotspot' : 'Hotspots'}
+              </span>
+            )}
+          </button>
+
           {/* Audit Trail Button */}
           {isAdmin && (
             <button
@@ -314,6 +388,81 @@ export default function Incidents() {
         </div>
       </div>
 
+      {/* Automated Threshold Breaches Banner */}
+      {thresholdConfig.enabled && breaches.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-5 sm:p-6 bg-gradient-to-r from-red-50 via-amber-50 to-orange-50 rounded-3xl border-2 border-red-200 shadow-sm space-y-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="p-3 bg-red-600 text-white rounded-2xl shadow-md shadow-red-500/20 shrink-0">
+                <BellRing className="w-6 h-6 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base sm:text-lg font-black text-gray-900 tracking-tight font-serif">
+                    Automated Alert Trigger: {breaches.length} Polling Unit{breaches.length > 1 ? 's' : ''} Exceeded Threshold
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-red-600 text-white shadow-xs">
+                    Limit: ≥ {thresholdConfig.incidentCountThreshold} Reports
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                  Automated surveillance engine flagged clusters of incidents requiring urgent administrative escalation.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setIsThresholdModalOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-800 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Sliders className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Configure Rules</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Filter Chips for Breached Polling Units */}
+          <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-1">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
+              <Flame className="w-3.5 h-3.5 text-red-600" /> Hotspot PUs:
+            </span>
+            {breaches.map((b) => (
+              <button
+                key={b.pollingUnitId}
+                onClick={() => setSearchQuery(b.pollingUnitId)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-2 border ${
+                  searchQuery === b.pollingUnitId
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-white hover:bg-red-100/60 text-gray-800 border-red-200'
+                }`}
+                title={`Filter incidents for PU #${b.pollingUnitId} (${b.count} reports)`}
+              >
+                <span className="font-mono font-bold">PU #{b.pollingUnitId}</span>
+                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-red-600 text-white">
+                  {b.count} reports
+                </span>
+                {b.acknowledged && (
+                  <span className="text-[10px] text-gray-400 font-normal">(Ack'd)</span>
+                )}
+              </button>
+            ))}
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="px-2.5 py-1 text-xs font-bold text-gray-500 hover:text-gray-800 underline cursor-pointer shrink-0"
+              >
+                Clear Filter
+              </button>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-20 text-center text-gray-400">Loading incidents...</div>
@@ -336,12 +485,23 @@ export default function Incidents() {
                 >
                   <div className="flex flex-col md:flex-row gap-8">
                     <div className="flex-1 space-y-4">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <StatusIcon status={incident.status} />
-                        <h3 className="text-xl font-bold text-gray-900 tracking-tight">
+                        <h3 className="text-xl font-bold text-gray-900 tracking-tight font-mono">
                           PU #{incident.pollingUnitId}
                         </h3>
                         <SeverityBadge severity={incident.severity} />
+                        {puBreachMap.has(incident.pollingUnitId) && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchQuery(incident.pollingUnitId)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 hover:bg-red-200 text-red-800 border border-red-200 cursor-pointer transition-colors"
+                            title={`Automated alert trigger: ${puBreachMap.get(incident.pollingUnitId)?.count} incidents exceed threshold limit of ${thresholdConfig.incidentCountThreshold}. Click to filter.`}
+                          >
+                            <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" />
+                            <span>Hotspot ({puBreachMap.get(incident.pollingUnitId)?.count} Reports)</span>
+                          </button>
+                        )}
                       </div>
                       
                       <p className="text-gray-600 text-lg leading-relaxed max-w-3xl">
@@ -458,6 +618,14 @@ export default function Incidents() {
       <AuditTrailModal
         isOpen={isAuditTrailOpen}
         onClose={() => setIsAuditTrailOpen(false)}
+      />
+
+      {/* Automated Incident Alert Thresholds Modal */}
+      <IncidentThresholdModal
+        isOpen={isThresholdModalOpen}
+        onClose={() => setIsThresholdModalOpen(false)}
+        incidents={incidents}
+        onSelectPollingUnitFilter={(pu) => setSearchQuery(pu)}
       />
     </div>
   );

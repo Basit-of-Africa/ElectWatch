@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '../context/AuthContext';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { getStoredThresholdConfig } from '../lib/incidentAlertService';
 import { savePendingReport } from '../lib/offlineStorage';
 import { Severity } from '../types';
 import { 
@@ -517,6 +518,51 @@ export default function Report() {
             } catch (notifErr) {
               console.warn('Non-blocking notification broadcast warning:', notifErr);
             }
+          }
+
+          // Automated threshold breach evaluation
+          try {
+            const threshConfig = getStoredThresholdConfig();
+            if (threshConfig.enabled) {
+              const puIdTrimmed = data.pollingUnitId.trim();
+              const puIncidentsSnap = await getDocs(
+                query(collection(db, 'incidents'), where('pollingUnitId', '==', puIdTrimmed))
+              );
+              const puCount = puIncidentsSnap.size; // includes existing incidents
+              if (puCount >= threshConfig.incidentCountThreshold) {
+                const thresholdTitle = `🚨 THRESHOLD BREACH: PU #${puIdTrimmed} reached ${puCount} incidents`;
+                const thresholdMessage = `Automated alert trigger: Polling Unit #${puIdTrimmed} has exceeded the automated threshold limit (≥ ${threshConfig.incidentCountThreshold} reports). Immediate supervisory review required.`;
+                
+                if (threshConfig.notifyAdmin) {
+                  await addDoc(collection(db, 'notifications'), {
+                    userId: 'admin',
+                    title: thresholdTitle,
+                    message: thresholdMessage,
+                    type: 'error',
+                    priority: 'critical',
+                    category: 'incident',
+                    read: false,
+                    link: `/incidents?search=${encodeURIComponent(puIdTrimmed)}`,
+                    timestamp: serverTimestamp(),
+                  });
+                }
+                if (threshConfig.notifySupervisor) {
+                  await addDoc(collection(db, 'notifications'), {
+                    userId: 'supervisor',
+                    title: thresholdTitle,
+                    message: thresholdMessage,
+                    type: 'warning',
+                    priority: 'critical',
+                    category: 'incident',
+                    read: false,
+                    link: `/incidents?search=${encodeURIComponent(puIdTrimmed)}`,
+                    timestamp: serverTimestamp(),
+                  });
+                }
+              }
+            }
+          } catch (threshErr) {
+            console.warn('Non-blocking automated threshold check warning:', threshErr);
           }
         } catch (incErr) {
           console.warn('Non-blocking incident record sync warning:', incErr);

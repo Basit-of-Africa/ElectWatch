@@ -138,3 +138,32 @@ export interface AuditLogEntry {
   timestamp: string | Timestamp;
   snapshot?: any;
 }
+
+export interface IncidentAlertThresholdConfig {
+  enabled: boolean;
+  incidentCountThreshold: number; // e.g. 2 or 3 incidents per polling unit
+  timeWindowHours: number; // 0 for all-time / election day, or e.g. 1, 3, 6, 12, 24
+  severityFilter: 'all' | 'high_critical' | 'critical';
+  notifyAdmin: boolean;
+  notifySupervisor: boolean;
+  soundAlert: boolean;
+  autoFlagHighRisk: boolean;
+  cooldownMinutes: number; // Minimum time between automated alerts for the same polling unit
+}
+
+export interface IncidentThresholdBreach {
+  pollingUnitId: string;
+  count: number;
+  threshold: number;
+  severities: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  latestIncidentTimestamp: any;
+  incidentIds: string[];
+  acknowledged: boolean;
+  triggeredAt: number;
+}
+
