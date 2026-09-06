@@ -30,7 +30,8 @@ import {
   FileSpreadsheet, 
   Activity, 
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  CirclePlus
 } from 'lucide-react';
 import { formatDistanceToNow, format, subDays, isSameDay } from 'date-fns';
 import { motion } from 'motion/react';
@@ -375,28 +376,30 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Osun Countdown & Official Scope Banner */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
-        <div className="lg:col-span-3">
-          <OsunCountdown />
-        </div>
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col justify-between shadow-xs">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Active Round</span>
-              <StatusBadge variant="active" label="Round 01 Active" />
-            </div>
-            <p className="text-sm font-bold text-gray-900 mt-1 font-serif">Osun Gubernatorial</p>
-            <p className="text-xs text-gray-500 mt-0.5">3,763 PUs • 30 LGAs • 1.95M Reg. Voters</p>
+      {/* Operational Field Actions */}
+      <div className="bg-slate-900 text-white rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">Operational Field Actions</span>
+            <h3 className="text-base sm:text-lg font-bold font-serif text-white">Primary Workflow Triggers</h3>
+            <p className="text-xs text-slate-300 max-w-xl">High-priority tools for rapid incident filing, voter accreditation audits, polling station mapping, and observer rosters.</p>
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-            <span className="text-gray-500 flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-gray-400" />
-              {format(new Date(), 'dd MMM yyyy')}
-            </span>
-            <Link to="/election-rounds" className="text-emerald-700 hover:text-emerald-800 font-bold inline-flex items-center gap-1">
-              <span>Rounds</span>
-              <ChevronRight className="w-3 h-3" />
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <Link className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-colors" to="/report">
+              <CirclePlus className="w-4 h-4" aria-hidden="true" />
+              <span>Submit Report</span>
+            </Link>
+            <Link className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-xs transition-colors" to="/report?type=incident">
+              <ShieldAlert className="w-4 h-4" aria-hidden="true" />
+              <span>Report Incident</span>
+            </Link>
+            <Link className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors" to="/polling-stations">
+              <Building2 className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+              <span>Polling Stations</span>
+            </Link>
+            <Link className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors" to="/observers">
+              <Users className="w-4 h-4 text-blue-400" aria-hidden="true" />
+              <span>Manage Observers</span>
             </Link>
           </div>
         </div>
