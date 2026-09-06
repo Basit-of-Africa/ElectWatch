@@ -125,6 +125,7 @@ export default function IncidentDetail() {
   const handleStatusUpdate = async (status: Incident['status']) => {
     if (!isAdmin || !id) return;
     try {
+      const prevStatus = incident?.status || 'unknown';
       await updateDoc(doc(db, 'incidents', id), { status });
       await addDoc(collection(db, `incidents/${id}/history`), {
         status,
@@ -132,6 +133,27 @@ export default function IncidentDetail() {
         updatedByName: auth.currentUser?.displayName,
         timestamp: serverTimestamp(),
       });
+
+      // Situation Room Audit Log
+      await logAuditEvent({
+        action: 'UPDATE_INCIDENT_STATUS',
+        targetId: id,
+        targetType: 'incident',
+        pollingUnitId: incident?.pollingUnitId,
+        summary: `Incident status transitioned from "${prevStatus.toUpperCase()}" to "${status.toUpperCase()}"`,
+        reason: `Administrative incident triage and lifecycle escalation`,
+        actorId: auth.currentUser?.uid,
+        actorName: auth.currentUser?.displayName || 'System Admin',
+        actorEmail: auth.currentUser?.email || undefined,
+        actorRole: 'admin',
+        details: {
+          previousStatus: prevStatus,
+          newStatus: status,
+          severity: incident?.severity,
+          pollingUnitId: incident?.pollingUnitId,
+        }
+      });
+
       // Update local state for immediate feedback
       setIncident(prev => prev ? { ...prev, status } : null);
     } catch (err) {

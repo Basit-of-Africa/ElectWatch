@@ -24,14 +24,16 @@ import AuditTrailModal from '../components/AuditTrailModal';
 import DownloadReportsModal from '../components/DownloadReportsModal';
 import DirectiveBroadcastModal from '../components/DirectiveBroadcastModal';
 import RoleUpgradeModal from '../components/RoleUpgradeModal';
-import { collection, onSnapshot, query, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, limit, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { User, Report } from '../types';
+import { User, Report, AuditLogEntry } from '../types';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function Administration() {
   const { user, isAdmin, isSupervisor } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [recentLogs, setRecentLogs] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
@@ -49,9 +51,15 @@ export default function Administration() {
       setReports(list);
     });
 
+    const unsubLogs = onSnapshot(query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(6)), (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLogEntry));
+      setRecentLogs(list);
+    });
+
     return () => {
       unsubUsers();
       unsubReports();
+      unsubLogs();
     };
   }, []);
 
@@ -295,24 +303,108 @@ export default function Administration() {
                 </button>
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-start justify-between gap-3">
+              <div className="p-4 bg-purple-50/60 rounded-xl border border-purple-100 flex items-start justify-between gap-3">
                 <div>
-                  <h4 className="text-xs font-bold text-gray-900 font-serif">Immutable Audit Trail</h4>
-                  <p className="text-[11px] text-gray-600 mt-0.5 leading-relaxed">
-                    Inspect cryptographic logs of all administrative deletions, incident updates, and broadcasts.
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-purple-950 font-serif">Immutable Audit Trail</h4>
+                    <span className="px-1.5 py-0.5 bg-purple-200 text-purple-800 rounded text-[9px] font-bold uppercase">Admin Only</span>
+                  </div>
+                  <p className="text-[11px] text-purple-900 mt-0.5 leading-relaxed">
+                    Inspect tamper-proof action logs of incident submissions, report revisions, and governance directives.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAuditModal(true)}
-                  className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer shadow-2xs"
-                >
-                  View Logs
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Link
+                    to="/audit-logs"
+                    className="px-3 py-1.5 bg-purple-900 hover:bg-purple-800 text-white rounded-lg text-xs font-bold shadow-2xs inline-flex items-center gap-1"
+                  >
+                    <span>Full View</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowAuditModal(true)}
+                    className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-800 border border-gray-200 rounded-lg text-xs font-bold shrink-0 cursor-pointer shadow-2xs"
+                  >
+                    Quick Log
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Live Recent Critical Action Logs */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+        <div className="p-5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-purple-700" />
+            <div>
+              <h3 className="font-bold text-xs uppercase tracking-wider text-gray-800">
+                Recent Critical Action Audit Stream
+              </h3>
+              <p className="text-[11px] text-gray-500">Live operational ledger capturing user and administrative activities</p>
+            </div>
+          </div>
+          <Link
+            to="/audit-logs"
+            className="text-xs font-bold text-purple-700 hover:text-purple-900 inline-flex items-center gap-1"
+          >
+            <span>View All Logs</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {recentLogs.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-xs">
+            No critical user action logs recorded yet.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 text-xs">
+            {recentLogs.map((log) => {
+              const actorName = log.actorName || log.deletedByName || 'System User';
+              const actorRole = log.actorRole || log.deletedByRole || 'observer';
+              let relativeTime = 'Just now';
+              if ((log.timestamp as any)?.toDate) {
+                relativeTime = formatDistanceToNow((log.timestamp as any).toDate(), { addSuffix: true });
+              }
+
+              return (
+                <div key={log.id} className="p-4 hover:bg-gray-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <span className="px-2 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded text-[10px] font-bold font-mono uppercase shrink-0">
+                      {log.action.replace(/_/g, ' ')}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">{log.summary || 'Critical activity'}</span>
+                        {log.pollingUnitId && (
+                          <span className="text-[10px] font-mono bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded font-bold">
+                            PU #{log.pollingUnitId}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        By <strong className="text-gray-700">{actorName}</strong> ({actorRole}) {log.reason && `• "${log.reason}"`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-right shrink-0">
+                    <span className="text-[11px] text-gray-400 font-medium">{relativeTime}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAuditModal(true)}
+                      className="text-purple-700 hover:text-purple-900 font-semibold text-[11px] cursor-pointer"
+                    >
+                      Inspect
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Modals */}

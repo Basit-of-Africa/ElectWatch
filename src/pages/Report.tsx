@@ -7,6 +7,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStoredThresholdConfig } from '../lib/incidentAlertService';
 import { savePendingReport, getIsOnline } from '../lib/offlineStorage';
+import { logAuditEvent } from '../lib/audit';
 import { toast } from 'sonner';
 import { Severity } from '../types';
 import { 
@@ -501,6 +502,28 @@ export default function Report() {
             timestamp: serverTimestamp(),
           });
 
+          // Log critical user action to Situation Room Audit Trail
+          await logAuditEvent({
+            action: 'SUBMIT_INCIDENT',
+            targetId: incidentRef.id,
+            targetType: 'incident',
+            pollingUnitId: data.pollingUnitId.trim(),
+            summary: `Incident submitted: ${data.incidentCategory || 'General'} (${data.severity?.toUpperCase() || 'MEDIUM'}) - ${data.description.trim().slice(0, 120)}`,
+            reason: `Field incident reported at Polling Unit #${data.pollingUnitId.trim()}`,
+            actorId: user?.uid || auth.currentUser?.uid,
+            actorName: user?.displayName || user?.email || 'Field Observer',
+            actorEmail: user?.email || undefined,
+            actorRole: user?.role || 'observer',
+            details: {
+              reportId: docRef.id,
+              severity: data.severity,
+              incidentCategory: data.incidentCategory,
+              bvasStatus: data.bvasStatus,
+              securityNotified: data.securityNotified,
+              description: data.description.trim()
+            }
+          });
+
           // Trigger notifications for critical/high incidents non-blockingly
           if (data.severity === 'critical' || data.severity === 'high') {
             try {
@@ -574,6 +597,25 @@ export default function Report() {
         } catch (incErr) {
           console.warn('Non-blocking incident record sync warning:', incErr);
         }
+      } else {
+        // Log accreditation or results submission
+        await logAuditEvent({
+          action: 'SUBMIT_REPORT',
+          targetId: docRef.id,
+          targetType: 'report',
+          pollingUnitId: data.pollingUnitId.trim(),
+          summary: `Observation report (${data.type.toUpperCase()}) submitted for PU #${data.pollingUnitId.trim()}`,
+          reason: `Field observer transmitted ${data.type} report data`,
+          actorId: user?.uid || auth.currentUser?.uid,
+          actorName: user?.displayName || user?.email || 'Field Observer',
+          actorEmail: user?.email || undefined,
+          actorRole: user?.role || 'observer',
+          details: {
+            reportType: data.type,
+            electionLevel: data.electionLevel,
+            accreditedCount: cleanPayload.voterCount,
+          }
+        });
       }
 
       setSuccess(true);

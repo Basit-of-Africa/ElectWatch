@@ -85,24 +85,29 @@
     },
     "AuditLog": {
       "title": "Audit Log",
-      "description": "Immutable administrative audit trail tracking report and incident deletions and critical state mutations.",
+      "description": "Immutable administrative audit trail tracking critical user actions including incident submissions, report edits, and deletions.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "action": { "type": "string", "enum": ["DELETE_REPORT", "DELETE_INCIDENT", "UPDATE_REPORT", "UPDATE_INCIDENT_STATUS", "BROADCAST_DIRECTIVE", "UPGRADE_USER_ROLE"] },
+        "action": { "type": "string", "enum": ["SUBMIT_INCIDENT", "EDIT_REPORT", "SUBMIT_REPORT", "DELETE_REPORT", "DELETE_INCIDENT", "UPDATE_REPORT", "UPDATE_INCIDENT_STATUS", "BROADCAST_DIRECTIVE", "UPGRADE_USER_ROLE"] },
         "targetId": { "type": "string" },
         "targetType": { "type": "string", "enum": ["report", "incident", "directive", "user"] },
         "pollingUnitId": { "type": "string" },
         "summary": { "type": "string" },
         "reason": { "type": "string" },
+        "actorId": { "type": "string" },
+        "actorEmail": { "type": "string", "format": "email" },
+        "actorName": { "type": "string" },
+        "actorRole": { "type": "string" },
         "deletedBy": { "type": "string" },
         "deletedByEmail": { "type": "string", "format": "email" },
         "deletedByName": { "type": "string" },
         "deletedByRole": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" },
+        "details": { "type": "object" },
         "snapshot": { "type": "object" }
       },
-      "required": ["action", "targetId", "targetType", "deletedBy", "deletedByName", "timestamp"]
+      "required": ["action", "targetId", "targetType", "timestamp"]
     },
     "Notification": {
       "title": "Notification",

@@ -16,6 +16,7 @@ import IncidentDetail from './pages/IncidentDetail';
 import Evidence from './pages/Evidence';
 import Notifications from './pages/Notifications';
 import Administration from './pages/Administration';
+import AuditLogs from './pages/AuditLogs';
 import MapPage from './pages/MapPage';
 import Observers from './pages/Observers';
 import Layout from './components/Layout';
@@ -81,6 +82,7 @@ function AppRoutes() {
         {/* Module 10: Administration */}
         <Route path="/administration" element={<Administration />} />
         <Route path="/admin" element={<Navigate to="/administration" replace />} />
+        <Route path="/audit-logs" element={<ProtectedRoute adminOnly><AuditLogs /></ProtectedRoute>} />
       </Route>
 
       {/* Fallback */}

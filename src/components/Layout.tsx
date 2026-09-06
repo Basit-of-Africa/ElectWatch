@@ -33,7 +33,8 @@ import {
   Globe, 
   BookOpen, 
   ShieldCheck,
-  CalendarDays
+  CalendarDays,
+  Activity
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -108,7 +109,8 @@ export default function Layout() {
       items: [
         { name: 'Notifications', href: '/notifications', icon: Bell, exact: false },
         ...(isAdmin || isSupervisor ? [
-          { name: 'Administration', href: '/administration', icon: ShieldCheck, match: ['/administration', '/admin'] }
+          { name: 'Administration', href: '/administration', icon: ShieldCheck, match: ['/administration', '/admin'] },
+          { name: 'Audit Logs', href: '/audit-logs', icon: Activity, exact: false }
         ] : []),
         { name: 'Public Live Feed', href: '/', icon: Globe, exact: true },
       ]

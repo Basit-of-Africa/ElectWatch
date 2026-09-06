@@ -64,11 +64,10 @@ service cloud.firestore {
     }
 
     function isValidAuditLog(data) {
-      return data.keys().hasAll(['action', 'targetId', 'targetType', 'deletedBy', 'deletedByName', 'timestamp']) &&
-             data.keys().size() <= 15 &&
-             data.action in ['DELETE_REPORT', 'DELETE_INCIDENT', 'UPDATE_REPORT', 'UPDATE_INCIDENT_STATUS', 'BROADCAST_DIRECTIVE', 'UPGRADE_USER_ROLE'] &&
-             data.targetType in ['report', 'incident', 'directive', 'user'] &&
-             data.deletedByName is string && data.deletedByName.size() <= 100;
+      return data.keys().hasAll(['action', 'targetId', 'targetType', 'timestamp']) &&
+             data.keys().size() <= 20 &&
+             data.action in ['SUBMIT_INCIDENT', 'EDIT_REPORT', 'SUBMIT_REPORT', 'DELETE_REPORT', 'DELETE_INCIDENT', 'UPDATE_REPORT', 'UPDATE_INCIDENT_STATUS', 'BROADCAST_DIRECTIVE', 'UPGRADE_USER_ROLE'] &&
+             data.targetType in ['report', 'incident', 'directive', 'user'];
     }
 
     function isValidIncident(data) {
@@ -121,7 +120,7 @@ service cloud.firestore {
 
       match /audit_logs/{logId} {
         allow read: if isSignedIn() && (isAdmin() || isSupervisor());
-        allow create: if isAdmin() && isValidAuditLog(incoming());
+        allow create: if isSignedIn();
       }
     }
 
@@ -139,7 +138,7 @@ service cloud.firestore {
 
     match /audit_logs/{logId} {
       allow read: if isSignedIn() && (isAdmin() || isSupervisor());
-      allow create: if isAdmin() && isValidAuditLog(incoming());
+      allow create: if isSignedIn() && isValidAuditLog(incoming());
       allow update, delete: if false; // Immutable audit log
     }
 

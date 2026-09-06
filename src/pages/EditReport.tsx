@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { logAuditEvent } from '../lib/audit';
 import { Report } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useForm } from 'react-hook-form';
@@ -108,7 +109,7 @@ export default function EditReport() {
         updatedAt: serverTimestamp()
       });
 
-      // Add to audit log
+      // Add to subcollection audit log
       await addDoc(collection(db, `reports/${id}/audit_logs`), {
         updatedBy: auth.currentUser?.uid,
         updatedByName: auth.currentUser?.displayName,
@@ -125,6 +126,33 @@ export default function EditReport() {
             payload: updatedPayload
           }
         }
+      });
+
+      // Record in Situation Room Central Audit Trail
+      await logAuditEvent({
+        action: 'EDIT_REPORT',
+        targetId: id,
+        targetType: 'report',
+        pollingUnitId: data.pollingUnitId,
+        summary: `Report edited: PU #${data.pollingUnitId} (${data.type.toUpperCase()}) updated`,
+        reason: 'Administrative report revision and data harmonization',
+        actorId: auth.currentUser?.uid,
+        actorName: auth.currentUser?.displayName || 'System Administrator',
+        actorEmail: auth.currentUser?.email || undefined,
+        actorRole: 'admin',
+        details: {
+          previousState: {
+            pollingUnitId: originalData.pollingUnitId,
+            type: originalData.type,
+            payload: originalData.payload
+          },
+          newState: {
+            pollingUnitId: data.pollingUnitId,
+            type: data.type,
+            payload: updatedPayload
+          }
+        },
+        snapshot: originalData
       });
 
       // If escalated to Incident, notify supervisors

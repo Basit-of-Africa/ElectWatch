@@ -2,6 +2,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { Report, Incident, ReportType, Severity } from '../types';
 import { requestBackgroundReportSync } from '../serviceWorkerRegistration';
+import { logAuditEvent } from './audit';
 
 export interface PendingReport {
   clientId: string;
@@ -226,6 +227,9 @@ export const syncPendingReports = async (overrideObserverId?: string): Promise<O
 
   // Use authenticated user UID to satisfy Firestore Security Rules (request.auth.uid == data.observerId)
   const activeUid = overrideObserverId || auth.currentUser?.uid;
+  const activeEmail = auth.currentUser?.email || undefined;
+  const activeDisplayName = auth.currentUser?.displayName || (activeEmail ? activeEmail.split('@')[0] : 'Field Observer');
+
   if (!activeUid) {
     console.warn('Sync delayed: Firebase user is not currently authenticated.');
     return { 
@@ -302,6 +306,44 @@ export const syncPendingReports = async (overrideObserverId?: string): Promise<O
             console.warn('Non-fatal notification push warning:', notifErr);
           }
         }
+
+        // Audit Trail entry for synchronized incident
+        await logAuditEvent({
+          action: 'SUBMIT_INCIDENT',
+          targetId: incidentRef.id,
+          targetType: 'incident',
+          pollingUnitId: item.pollingUnitId,
+          summary: `Incident synced from offline queue: PU #${item.pollingUnitId} (${item.payload?.severity?.toUpperCase() || 'MEDIUM'})`,
+          reason: 'Automatic background synchronization from offline device cache',
+          actorId: activeUid,
+          actorName: activeEmail ? activeEmail.split('@')[0] : 'Field Observer',
+          actorEmail: activeEmail,
+          actorRole: 'observer',
+          details: {
+            reportId: docRef.id,
+            offlineCreatedAt: item.createdAtISO,
+            severity: item.payload?.severity,
+            category: item.payload?.incidentCategory
+          }
+        });
+      } else {
+        // Audit Trail entry for regular synchronized report
+        await logAuditEvent({
+          action: 'SUBMIT_REPORT',
+          targetId: docRef.id,
+          targetType: 'report',
+          pollingUnitId: item.pollingUnitId,
+          summary: `Report (${item.type.toUpperCase()}) synced from offline cache for PU #${item.pollingUnitId}`,
+          reason: 'Automatic background synchronization from offline device cache',
+          actorId: activeUid,
+          actorName: activeEmail ? activeEmail.split('@')[0] : 'Field Observer',
+          actorEmail: activeEmail,
+          actorRole: 'observer',
+          details: {
+            offlineCreatedAt: item.createdAtISO,
+            reportType: item.type
+          }
+        });
       }
 
       removePendingReport(item.clientId);

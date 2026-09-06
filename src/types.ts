@@ -123,19 +123,36 @@ export interface Notification {
   timestamp: string | Timestamp;
 }
 
+export type AuditActionType = 
+  | 'SUBMIT_INCIDENT'
+  | 'EDIT_REPORT'
+  | 'SUBMIT_REPORT'
+  | 'DELETE_REPORT' 
+  | 'DELETE_INCIDENT' 
+  | 'UPDATE_REPORT' 
+  | 'UPDATE_INCIDENT_STATUS' 
+  | 'BROADCAST_DIRECTIVE' 
+  | 'UPGRADE_USER_ROLE';
+
 export interface AuditLogEntry {
   id: string;
-  action: 'DELETE_REPORT' | 'DELETE_INCIDENT' | 'UPDATE_REPORT' | 'UPDATE_INCIDENT_STATUS' | 'BROADCAST_DIRECTIVE' | 'UPGRADE_USER_ROLE';
+  action: AuditActionType;
   targetId: string;
   targetType: 'report' | 'incident' | 'directive' | 'user';
   pollingUnitId?: string;
   summary: string;
   reason?: string;
-  deletedBy: string;
+  actorId?: string;
+  actorEmail?: string;
+  actorName?: string;
+  actorRole?: string;
+  // Preserved for backwards compatibility with existing deletion entries
+  deletedBy?: string;
   deletedByEmail?: string;
-  deletedByName: string;
+  deletedByName?: string;
   deletedByRole?: string;
   timestamp: string | Timestamp;
+  details?: any;
   snapshot?: any;
 }
 

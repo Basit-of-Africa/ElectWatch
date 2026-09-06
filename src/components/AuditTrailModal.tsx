@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { AuditLogEntry } from '../types';
+import { AuditLogEntry, AuditActionType } from '../types';
 import { 
   History, 
   X, 
@@ -18,11 +18,16 @@ import {
   Radio, 
   Filter, 
   AlertTriangle,
-  Lock
+  Lock,
+  FileEdit,
+  Send,
+  KeyRound,
+  ExternalLink
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface AuditTrailModalProps {
   isOpen: boolean;
@@ -59,20 +64,37 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
 
   const filteredLogs = logs.filter(log => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = 
-      (log.targetId && log.targetId.toLowerCase().includes(term)) ||
-      (log.pollingUnitId && log.pollingUnitId.toLowerCase().includes(term)) ||
-      (log.summary && log.summary.toLowerCase().includes(term)) ||
-      (log.reason && log.reason.toLowerCase().includes(term)) ||
-      (log.deletedByName && log.deletedByName.toLowerCase().includes(term)) ||
-      (log.deletedByEmail && log.deletedByEmail.toLowerCase().includes(term));
+    const actorName = log.actorName || log.deletedByName || '';
+    const actorEmail = log.actorEmail || log.deletedByEmail || '';
+    const summary = log.summary || '';
+    const reason = log.reason || '';
+    const targetId = log.targetId || '';
+    const puId = log.pollingUnitId || '';
 
-    const matchesFilter = 
-      actionFilter === 'all' ? true :
-      actionFilter === 'deletions' ? (log.action === 'DELETE_REPORT' || log.action === 'DELETE_INCIDENT') :
-      actionFilter === 'reports' ? log.action === 'DELETE_REPORT' :
-      actionFilter === 'incidents' ? log.action === 'DELETE_INCIDENT' :
-      log.action === actionFilter;
+    const matchesSearch = 
+      targetId.toLowerCase().includes(term) ||
+      puId.toLowerCase().includes(term) ||
+      summary.toLowerCase().includes(term) ||
+      reason.toLowerCase().includes(term) ||
+      actorName.toLowerCase().includes(term) ||
+      actorEmail.toLowerCase().includes(term);
+
+    let matchesFilter = true;
+    if (actionFilter === 'all') {
+      matchesFilter = true;
+    } else if (actionFilter === 'incidents') {
+      matchesFilter = log.action === 'SUBMIT_INCIDENT' || log.action === 'UPDATE_INCIDENT_STATUS' || log.action === 'DELETE_INCIDENT';
+    } else if (actionFilter === 'edits') {
+      matchesFilter = log.action === 'EDIT_REPORT' || log.action === 'UPDATE_REPORT';
+    } else if (actionFilter === 'submissions') {
+      matchesFilter = log.action === 'SUBMIT_INCIDENT' || log.action === 'SUBMIT_REPORT';
+    } else if (actionFilter === 'deletions') {
+      matchesFilter = log.action === 'DELETE_REPORT' || log.action === 'DELETE_INCIDENT';
+    } else if (actionFilter === 'governance') {
+      matchesFilter = log.action === 'BROADCAST_DIRECTIVE' || log.action === 'UPGRADE_USER_ROLE';
+    } else {
+      matchesFilter = log.action === actionFilter;
+    }
 
     return matchesSearch && matchesFilter;
   });
@@ -83,7 +105,7 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
       return;
     }
 
-    const headers = ['Audit ID', 'Timestamp', 'Action', 'Target Type', 'Target ID', 'Polling Unit', 'Admin Name', 'Admin Email', 'Reason', 'Summary'];
+    const headers = ['Audit ID', 'Timestamp', 'Action', 'Target Type', 'Target ID', 'Polling Unit', 'Actor Name', 'Actor Email', 'Actor Role', 'Reason', 'Summary'];
     const rows = filteredLogs.map(l => {
       let timeStr = 'N/A';
       if ((l.timestamp as any)?.toDate) {
@@ -92,6 +114,10 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
         timeStr = String(l.timestamp);
       }
 
+      const actorName = l.actorName || l.deletedByName || 'System';
+      const actorEmail = l.actorEmail || l.deletedByEmail || 'N/A';
+      const actorRole = l.actorRole || l.deletedByRole || 'admin';
+
       return [
         `"${l.id}"`,
         `"${timeStr}"`,
@@ -99,8 +125,9 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
         `"${l.targetType}"`,
         `"${l.targetId}"`,
         `"${l.pollingUnitId || ''}"`,
-        `"${(l.deletedByName || '').replace(/"/g, '""')}"`,
-        `"${l.deletedByEmail || ''}"`,
+        `"${actorName.replace(/"/g, '""')}"`,
+        `"${actorEmail}"`,
+        `"${actorRole}"`,
         `"${(l.reason || '').replace(/"/g, '""')}"`,
         `"${(l.summary || '').replace(/"/g, '""')}"`,
       ].join(',');
@@ -119,8 +146,33 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
     toast.success('Exported audit trail CSV successfully.');
   };
 
-  const getActionBadge = (action: AuditLogEntry['action']) => {
+  const getActionBadge = (action: AuditActionType) => {
     switch (action) {
+      case 'SUBMIT_INCIDENT':
+        return (
+          <span className="px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3 text-rose-600" /> Incident Submitted
+          </span>
+        );
+      case 'EDIT_REPORT':
+      case 'UPDATE_REPORT':
+        return (
+          <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
+            <FileEdit className="w-3 h-3 text-amber-600" /> Report Edited
+          </span>
+        );
+      case 'SUBMIT_REPORT':
+        return (
+          <span className="px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
+            <Send className="w-3 h-3 text-blue-600" /> Report Submitted
+          </span>
+        );
+      case 'UPDATE_INCIDENT_STATUS':
+        return (
+          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Status Updated
+          </span>
+        );
       case 'DELETE_REPORT':
         return (
           <span className="px-2.5 py-1 bg-red-100 text-red-800 border border-red-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
@@ -130,13 +182,19 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
       case 'DELETE_INCIDENT':
         return (
           <span className="px-2.5 py-1 bg-orange-100 text-orange-800 border border-orange-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
-            <ShieldAlert className="w-3 h-3 text-orange-600" /> Deleted Incident
+            <Trash2 className="w-3 h-3 text-orange-600" /> Deleted Incident
           </span>
         );
       case 'BROADCAST_DIRECTIVE':
         return (
           <span className="px-2.5 py-1 bg-purple-100 text-purple-800 border border-purple-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
             <Radio className="w-3 h-3 text-purple-600" /> Directive Broadcast
+          </span>
+        );
+      case 'UPGRADE_USER_ROLE':
+        return (
+          <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 border border-indigo-200 text-[10px] font-black uppercase tracking-wider rounded-lg flex items-center gap-1">
+            <KeyRound className="w-3 h-3 text-indigo-600" /> Role Updated
           </span>
         );
       default:
@@ -159,34 +217,43 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
         {/* Modal Header */}
         <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
               <History className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold font-serif">System Audit Trail</h2>
-                <span className="px-2 py-0.5 bg-emerald-950 border border-emerald-700/60 text-emerald-400 text-[10px] font-mono font-bold rounded-md uppercase">
-                  IMMUTABLE LOG
+                <h2 className="text-xl font-bold font-serif">Situation Room Audit Trail</h2>
+                <span className="px-2 py-0.5 bg-purple-950 border border-purple-700/60 text-purple-300 text-[10px] font-mono font-bold rounded-md uppercase">
+                  ADMIN ONLY • IMMUTABLE
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
-                Official chronological record of administrative actions, test purges, and report deletions
+                Official audit log recording incident submissions, report modifications, status changes, and governance events.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              to="/audit-logs"
+              onClick={onClose}
+              className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+              title="Open full page audit log view"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Full View</span>
+            </Link>
             <button
               onClick={exportAuditCSV}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer"
-              title="Download entire audit trail as CSV"
+              title="Download filtered audit records as CSV"
             >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <Download className="w-3.5 h-3.5 text-purple-300" />
               <span>Export CSV</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -199,30 +266,37 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by PU ID, Admin email, reason..."
+              placeholder="Search by PU #, Actor, reason, summary..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500/20 focus:outline-none"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-purple-500/20 focus:outline-none"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto">
             <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-            {['all', 'deletions', 'reports', 'incidents'].map((filt) => (
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'incidents', label: 'Incidents' },
+              { id: 'edits', label: 'Edits' },
+              { id: 'submissions', label: 'Submissions' },
+              { id: 'deletions', label: 'Deletions' },
+              { id: 'governance', label: 'Directives' },
+            ].map((filt) => (
               <button
-                key={filt}
-                onClick={() => setActionFilter(filt)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all shrink-0 ${
-                  actionFilter === filt
+                key={filt.id}
+                onClick={() => setActionFilter(filt.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  actionFilter === filt.id
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
                 }`}
               >
-                {filt}
+                {filt.label}
               </button>
             ))}
-            <span className="text-xs font-mono text-gray-400 bg-gray-200/80 px-2 py-1 rounded-lg">
-              {filteredLogs.length} Records
+            <span className="text-xs font-mono text-gray-500 bg-gray-200/80 px-2.5 py-1 rounded-lg">
+              {filteredLogs.length}
             </span>
           </div>
         </div>
@@ -231,7 +305,7 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {loading ? (
             <div className="py-20 text-center text-gray-400 space-y-3">
-              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
               <p className="text-xs font-medium">Retrieving immutable audit logs from database...</p>
             </div>
           ) : filteredLogs.length === 0 ? (
@@ -239,12 +313,16 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
               <Lock className="w-10 h-10 text-gray-300 mx-auto" />
               <h4 className="font-bold text-gray-700 font-serif">No Audit Records Found</h4>
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                Any future report deletions, incident purges, or critical administrative mutations will automatically be logged here.
+                No events match your current filter parameters. Try clearing the search or selecting "All".
               </p>
             </div>
           ) : (
             filteredLogs.map((log) => {
               const isExpanded = expandedLogId === log.id;
+              const actorName = log.actorName || log.deletedByName || 'System';
+              const actorEmail = log.actorEmail || log.deletedByEmail || '';
+              const actorRole = log.actorRole || log.deletedByRole || 'observer';
+
               let formattedDate = 'N/A';
               let relativeDate = 'Recently';
               if ((log.timestamp as any)?.toDate) {
@@ -271,11 +349,11 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
                       {getActionBadge(log.action)}
                       {log.pollingUnitId && (
                         <span className="px-2 py-0.5 bg-slate-100 text-slate-800 font-mono font-bold text-xs rounded-md">
-                          PU: {log.pollingUnitId}
+                          PU: #{log.pollingUnitId}
                         </span>
                       )}
                       <span className="text-[11px] font-mono text-gray-400">
-                        ID: {log.targetId.substring(0, 8)}...
+                        Target: {log.targetType.toUpperCase()} ({log.targetId ? log.targetId.substring(0, 8) + '...' : 'N/A'})
                       </span>
                     </div>
 
@@ -287,7 +365,7 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
                     </div>
                   </div>
 
-                  {/* Summary & Deletion Reason */}
+                  {/* Summary & Justification */}
                   <div className="space-y-1">
                     {log.summary && (
                       <p className="text-sm font-semibold text-gray-800 font-sans">
@@ -295,43 +373,47 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
                       </p>
                     )}
                     {log.reason && (
-                      <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200/80 px-3 py-1.5 rounded-xl flex items-center gap-2">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span><strong>Reason provided:</strong> {log.reason}</span>
+                      <div className="text-xs text-slate-700 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl flex items-center gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span><strong>Context / Reason:</strong> {log.reason}</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Actor Details & Snapshot Trigger */}
+                  {/* Actor Details & Payload Trigger */}
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100 text-xs text-gray-600">
                     <div className="flex items-center gap-2">
-                      <User className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Performed by: <strong className="text-gray-900">{log.deletedByName}</strong> ({log.deletedByEmail})</span>
+                      <User className="w-3.5 h-3.5 text-purple-600" />
+                      <span>
+                        Action by: <strong className="text-gray-900">{actorName}</strong>
+                        {actorRole && <span className="ml-1.5 px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-[10px] uppercase font-bold">{actorRole}</span>}
+                        {actorEmail && <span className="text-gray-400 ml-1">({actorEmail})</span>}
+                      </span>
                     </div>
 
-                    {log.snapshot && (
+                    {(log.details || log.snapshot) && (
                       <button
                         onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                        className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 cursor-pointer transition-colors"
+                        className="flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-800 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200 cursor-pointer transition-colors"
                       >
                         <FileText className="w-3 h-3" />
-                        <span>{isExpanded ? 'Hide Data Snapshot' : 'View Deleted Snapshot'}</span>
+                        <span>{isExpanded ? 'Hide Payload' : 'Inspect Payload Details'}</span>
                         {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                       </button>
                     )}
                   </div>
 
-                  {/* Expanded JSON Snapshot of the deleted record */}
-                  {isExpanded && log.snapshot && (
+                  {/* Expanded JSON Snapshot of the record */}
+                  {isExpanded && (log.details || log.snapshot) && (
                     <motion.div 
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
-                      className="bg-slate-900 text-emerald-300 p-4 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800"
+                      className="bg-slate-900 text-purple-200 p-4 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800"
                     >
                       <div className="text-slate-400 mb-1 text-[10px] uppercase font-sans font-bold">
-                        Pre-Deletion Snapshot Payload:
+                        Audit Captured State / Details:
                       </div>
-                      <pre>{JSON.stringify(log.snapshot, null, 2)}</pre>
+                      <pre>{JSON.stringify(log.details || log.snapshot, null, 2)}</pre>
                     </motion.div>
                   )}
                 </div>
@@ -343,12 +425,12 @@ export default function AuditTrailModal({ isOpen, onClose }: AuditTrailModalProp
         {/* Modal Footer */}
         <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-emerald-600" />
-            <span>Audit logs are permanently synchronized and cannot be modified or purged by any user.</span>
+            <ShieldAlert className="w-4 h-4 text-purple-600" />
+            <span>Audit trail is write-only and tamper-proof according to statutory oversight protocols.</span>
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition-all cursor-pointer"
           >
             Close Audit Trail
           </button>
