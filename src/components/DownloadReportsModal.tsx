@@ -14,16 +14,20 @@ import {
   ArrowRight,
   Database,
   Sparkles,
-  Info
+  Info,
+  Building2,
+  MapPin
 } from 'lucide-react';
 import { Report } from '../types';
 import { 
   exportIncidentReportsCSV, 
   exportAccreditationReportsCSV, 
   exportMasterReportsCSV,
+  exportPollingStationsCSV,
   filterReportsForExport,
   ObserverInfo,
-  IncidentMeta
+  IncidentMeta,
+  KNOWN_STATION_NAMES
 } from '../lib/reportExport';
 import { toast } from 'sonner';
 
@@ -79,11 +83,20 @@ export default function DownloadReportsModal({
     return scopedReports.filter(r => r.type === 'result').length;
   }, [scopedReports]);
 
+  const stationCount = useMemo(() => {
+    const set = new Set<string>();
+    scopedReports.forEach(r => {
+      if (r.pollingUnitId) set.add(r.pollingUnitId);
+    });
+    // Include baseline Osun stations count if greater
+    return Math.max(set.size, Object.keys(KNOWN_STATION_NAMES).length);
+  }, [scopedReports]);
+
   const totalCount = scopedReports.length;
 
   if (!isOpen) return null;
 
-  const handleExport = (type: 'incident' | 'accreditation' | 'master') => {
+  const handleExport = (type: 'incident' | 'polling_station' | 'accreditation' | 'master') => {
     setExportingType(type);
     try {
       const options = {
@@ -93,7 +106,13 @@ export default function DownloadReportsModal({
         incidentMap
       };
 
-      if (type === 'incident') {
+      if (type === 'polling_station') {
+        const res = exportPollingStationsCSV(baseReports, {
+          ...options,
+          customFilenamePrefix: dataScope === 'filtered' ? 'ivote_filtered_polling_stations' : 'ivote_polling_stations_dataset'
+        });
+        toast.success(`Exported ${res.count} Polling Station Records to ${res.filename}`);
+      } else if (type === 'incident') {
         if (incidentCount === 0) {
           toast.error('No incident reports found matching selected filters');
           return;
@@ -260,15 +279,59 @@ export default function DownloadReportsModal({
             )}
           </div>
 
-          {/* Three Primary Structured Export Cards */}
+          {/* Structured Export Cards Grid */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
               <Database className="w-4 h-4 text-emerald-600" />
-              <span>Structured Export Formats</span>
+              <span>Structured CSV Export Formats</span>
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Card 1: Incident Reports Dataset */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Card 1: Polling Station Data Dataset */}
+              <div className="p-6 rounded-3xl border-2 border-blue-200 bg-blue-50/30 flex flex-col justify-between hover:border-blue-300 transition-all">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <span className="text-[11px] font-bold text-blue-800 bg-blue-100/80 border border-blue-200 px-3 py-1 rounded-full uppercase tracking-wider">
+                      Polling Stations
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-bold text-gray-900">Polling Station Data CSV</h4>
+                    <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                      Comprehensive station-by-station aggregated dataset: Total reports, incident frequencies, critical disruptions, peak accredited voters, BVAS status, and EC8A vote totals.
+                    </p>
+                  </div>
+
+                  {/* Field Highlights */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {['PU Code & Name', 'State/LGA/Ward', 'Total Reports', 'Incident Counts', 'Accredited Voters', 'BVAS Health', 'Party Tallies', 'GPS Coordinates'].map((tag) => (
+                      <span key={tag} className="text-[10px] font-semibold bg-white border border-blue-200 text-blue-800 px-2 py-0.5 rounded-lg">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-6 mt-4 border-t border-blue-100 flex items-center justify-between gap-3">
+                  <div className="text-xs font-mono font-bold text-blue-900">
+                    {stationCount} Polling {stationCount === 1 ? 'Station' : 'Stations'}
+                  </div>
+                  <button
+                    onClick={() => handleExport('polling_station')}
+                    disabled={exportingType === 'polling_station'}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Stations CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Incident Reports Dataset */}
               <div className="p-6 rounded-3xl border-2 border-red-200 bg-red-50/30 flex flex-col justify-between hover:border-red-300 transition-all">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -312,7 +375,7 @@ export default function DownloadReportsModal({
                 </div>
               </div>
 
-              {/* Card 2: Accreditation & Turnout Dataset */}
+              {/* Card 3: Accreditation & Turnout Dataset */}
               <div className="p-6 rounded-3xl border-2 border-emerald-200 bg-emerald-50/30 flex flex-col justify-between hover:border-emerald-300 transition-all">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -351,7 +414,7 @@ export default function DownloadReportsModal({
                     className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Download Accreditation CSV</span>
+                    <span>Download Turnout CSV</span>
                   </button>
                 </div>
               </div>

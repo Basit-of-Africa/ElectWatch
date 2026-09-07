@@ -20,10 +20,11 @@ import {
   RotateCcw, 
   ArrowUpDown, 
   ChevronDown, 
-  ChevronUp,
-  FileText,
-  Users,
-  Activity
+  ChevronUp, 
+  FileText, 
+  Users, 
+  Activity, 
+  Download 
 } from 'lucide-react';
 import { Report } from '../types';
 
@@ -31,6 +32,7 @@ interface ReportsByPollingStationChartProps {
   reports: Report[];
   selectedStation?: string;
   onSelectStation?: (stationId: string) => void;
+  onExportCSV?: () => void;
   className?: string;
 }
 
@@ -61,6 +63,7 @@ export default function ReportsByPollingStationChart({
   reports,
   selectedStation = '',
   onSelectStation,
+  onExportCSV,
   className = ''
 }: ReportsByPollingStationChartProps) {
   const [chartMode, setChartMode] = useState<ChartMode>('stacked');
@@ -375,6 +378,20 @@ export default function ReportsByPollingStationChart({
               <option value={25}>Top 25</option>
               <option value={0}>All Stations ({totalUniqueStations})</option>
             </select>
+
+            {/* Export Polling Station CSV Button */}
+            {onExportCSV && (
+              <button
+                type="button"
+                onClick={onExportCSV}
+                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                title="Download Polling Station Dataset as CSV"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-700" />
+                <span className="hidden sm:inline">Export Stations CSV</span>
+                <span className="sm:hidden">CSV</span>
+              </button>
+            )}
 
             {/* Minimize / Expand Toggle */}
             <button

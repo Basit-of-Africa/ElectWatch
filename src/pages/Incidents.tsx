@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Incident, IncidentAlertThresholdConfig } from '../types';
+import { Incident, IncidentAlertThresholdConfig, Report } from '../types';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { cacheFetchedIncidents, getCachedIncidents, getQueuedIncidents, getIsOnline, syncPendingReports, PendingReport } from '../lib/offlineStorage';
@@ -9,6 +9,7 @@ import { logAuditEvent } from '../lib/audit';
 import AuditTrailModal from '../components/AuditTrailModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import IncidentThresholdModal from '../components/IncidentThresholdModal';
+import IncidentMapOverlay from '../components/IncidentMapOverlay';
 import { 
   getStoredThresholdConfig, 
   evaluateIncidentThresholds, 
@@ -38,7 +39,12 @@ import {
   WifiOff,
   Wifi,
   HardDrive,
-  RefreshCw
+  RefreshCw,
+  MapPin,
+  Map as MapIcon,
+  Compass,
+  Layers,
+  LayoutGrid
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -68,6 +74,14 @@ export default function Incidents() {
   const [queuedIncidents, setQueuedIncidents] = useState<PendingReport[]>(getQueuedIncidents);
   const [isOnline, setIsOnline] = useState(getIsOnline);
   const [isSyncingQueued, setIsSyncingQueued] = useState(false);
+
+  // Field Reports stream (for geographic GPS coordinate cross-referencing)
+  const [reports, setReports] = useState<Report[]>([]);
+
+  // Interactive Tactical Map Overlay states
+  const [showMapOverlay, setShowMapOverlay] = useState<boolean>(true);
+  const [selectedMapIncidentId, setSelectedMapIncidentId] = useState<string | null>(null);
+  const [displayLayout, setDisplayLayout] = useState<'split' | 'table' | 'map'>('split');
 
   // Sync threshold config & offline queue updates
   useEffect(() => {
@@ -197,7 +211,7 @@ export default function Incidents() {
     }
 
     const q = query(collection(db, 'incidents'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeIncidents = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Incident));
       setIncidents(docs);
       cacheFetchedIncidents(docs);
@@ -213,7 +227,24 @@ export default function Incidents() {
       }
     });
 
-    return () => unsubscribe();
+    // Also listen to reports to resolve GPS coordinates for incidents
+    let unsubscribeReports = () => {};
+    try {
+      const qReports = query(collection(db, 'reports'), orderBy('timestamp', 'desc'));
+      unsubscribeReports = onSnapshot(qReports, (snapshot) => {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report));
+        setReports(docs);
+      }, (err) => {
+        console.warn('Reports stream fallback in Incidents:', err);
+      });
+    } catch (e) {
+      console.warn('Failed to subscribe to reports in Incidents:', e);
+    }
+
+    return () => {
+      unsubscribeIncidents();
+      unsubscribeReports();
+    };
   }, []);
 
   const handleStatusUpdate = async (incidentId: string, status: Incident['status']) => {
@@ -306,6 +337,81 @@ export default function Incidents() {
         </div>
         
         <div className="flex flex-col md:flex-row xl:flex-row xl:items-center gap-4 w-full xl:w-auto">
+          {/* Interactive Incident Map Overlay Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowMapOverlay(prev => !prev);
+              if (!showMapOverlay && displayLayout === 'table') {
+                setDisplayLayout('split');
+              }
+            }}
+            className={`flex items-center gap-2 px-4 py-3 rounded-2xl shadow-sm text-sm font-bold transition-all cursor-pointer border shrink-0 ${
+              showMapOverlay
+                ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 shadow-xs'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            }`}
+            title={showMapOverlay ? "Collapse Map Overlay" : "Open Interactive Incident Map Overlay"}
+          >
+            <MapPin className={`w-4 h-4 ${showMapOverlay ? 'text-red-600 animate-pulse' : 'text-gray-500'}`} />
+            <span>Map Overlay</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-white text-red-700 border border-red-200">
+              {filteredIncidents.length}
+            </span>
+          </button>
+
+          {/* Layout View Switcher */}
+          <div className="flex items-center bg-white p-1 rounded-2xl border border-gray-200 shadow-sm text-xs font-bold shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setDisplayLayout('split');
+                setShowMapOverlay(true);
+              }}
+              className={`px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                displayLayout === 'split' && showMapOverlay
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+              title="Split Layout: Map Overlay above Incident List"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Split</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDisplayLayout('map');
+                setShowMapOverlay(true);
+              }}
+              className={`px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                displayLayout === 'map' && showMapOverlay
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+              title="Map Focus View: Dedicated geographic view"
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Map</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDisplayLayout('table');
+                setShowMapOverlay(false);
+              }}
+              className={`px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                displayLayout === 'table' || !showMapOverlay
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+              title="Table View: Maximum space for incident directory"
+            >
+              <TableIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+          </div>
+
           {/* Alert Thresholds Configuration Button */}
           <button
             onClick={() => setIsThresholdModalOpen(true)}
@@ -313,7 +419,7 @@ export default function Incidents() {
             title="Configure Automated Incident Alert Trigger Thresholds"
           >
             <Sliders className="w-4 h-4 text-emerald-600 group-hover:rotate-45 transition-transform" />
-            <span>Alert Thresholds</span>
+            <span className="hidden md:inline">Alert Thresholds</span>
             {thresholdConfig.enabled && breaches.length > 0 && (
               <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
                 unacknowledgedBreaches.length > 0 
@@ -333,7 +439,7 @@ export default function Incidents() {
               title="Open System Audit Trail"
             >
               <History className="w-4 h-4 text-emerald-400" />
-              <span>Audit Trail</span>
+              <span className="hidden md:inline">Audit Trail</span>
             </button>
           )}
 
@@ -564,7 +670,64 @@ export default function Incidents() {
         </motion.div>
       )}
 
-      <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+      {/* Tactical Incident Map Overlay */}
+      {showMapOverlay && (
+        <div id="incident-map-overlay-section" className="space-y-3">
+          <IncidentMapOverlay
+            incidents={filteredIncidents}
+            reports={reports}
+            selectedIncidentId={selectedMapIncidentId}
+            onSelectIncident={(inc) => {
+              setSelectedMapIncidentId(inc.id);
+            }}
+            onFilterPollingUnit={(puId) => setSearchQuery(puId)}
+            thresholdConfig={thresholdConfig}
+            defaultExpanded={true}
+          />
+        </div>
+      )}
+
+      {/* Map Focus helper notice if table is hidden in map-only mode */}
+      {displayLayout === 'map' && showMapOverlay && (
+        <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-700 flex items-center justify-center font-bold">
+              <MapIcon className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-gray-900">Map Focus View Active</h4>
+              <p className="text-xs text-gray-500">
+                Displaying {filteredIncidents.length} spatial incidents on the map overlay. Switch to Split View or Table to inspect detailed logs.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setDisplayLayout('split');
+                setShowMapOverlay(true);
+              }}
+              className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              Show Split View
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDisplayLayout('table');
+                setShowMapOverlay(false);
+              }}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              Show Table Only
+            </button>
+          </div>
+        </div>
+      )}
+
+      {displayLayout !== 'map' && (
+        <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-20 text-center text-gray-400">Loading incidents...</div>
         ) : filteredIncidents.length === 0 ? (
@@ -629,7 +792,7 @@ export default function Incidents() {
                         </div>
                       )}
 
-                      <div className="flex items-center gap-6 text-sm text-gray-400 font-medium">
+                      <div className="flex items-center gap-4 flex-wrap text-sm text-gray-400 font-medium">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-4 h-4" /> 
                           {(incident.timestamp as any)?.toDate ? formatDistanceToNow((incident.timestamp as any).toDate(), { addSuffix: true }) : 'N/A'}
@@ -638,6 +801,23 @@ export default function Incidents() {
                         <span className="flex items-center gap-1.5">
                           Report ID: <span className="font-mono text-xs bg-gray-100 px-1.5 rounded">{incident.reportId.slice(0, 8)}</span>
                         </span>
+                        <span className="h-1 w-1 rounded-full bg-gray-300" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMapIncidentId(incident.id);
+                            setShowMapOverlay(true);
+                            const mapEl = document.getElementById('incident-map-overlay-section');
+                            if (mapEl) {
+                              mapEl.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                          className="flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-100 transition-colors cursor-pointer"
+                          title="Locate incident on interactive map overlay"
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          <span>View on Map</span>
+                        </button>
                       </div>
                     </div>
 
@@ -703,6 +883,7 @@ export default function Incidents() {
           </div>
         )}
       </div>
+      )}
 
       {/* Delete Confirmation Modal for Incidents */}
       <DeleteConfirmationModal

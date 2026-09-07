@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, addDoc, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Report } from '../types';
@@ -28,7 +28,8 @@ import {
   CheckCircle2,
   ShieldAlert,
   Users,
-  X
+  X,
+  Building2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -40,8 +41,10 @@ import {
   exportIncidentReportsCSV, 
   exportAccreditationReportsCSV, 
   exportMasterReportsCSV,
+  exportPollingStationsCSV,
   ObserverInfo,
-  IncidentMeta
+  IncidentMeta,
+  KNOWN_STATION_NAMES
 } from '../lib/reportExport';
 import DownloadReportsModal from '../components/DownloadReportsModal';
 import ReportsByPollingStationChart from '../components/ReportsByPollingStationChart';
@@ -106,6 +109,20 @@ export default function Reports() {
   }, []);
 
   // Quick 1-click structured export handlers
+  const handleExportPollingStations = () => {
+    try {
+      const res = exportPollingStationsCSV(filteredReports, {
+        observerMap,
+        incidentMap,
+        customFilenamePrefix: 'ivote_polling_stations_dataset'
+      });
+      setShowExportMenu(false);
+      toast.success(`Exported ${res.count} Polling Station Records to ${res.filename}`);
+    } catch (err: any) {
+      toast.error('Failed to export polling station data: ' + err.message);
+    }
+  };
+
   const handleExportIncidents = () => {
     try {
       const target = filteredReports.filter(r => r.type === 'incident');
@@ -408,6 +425,14 @@ export default function Reports() {
     return matchesSearch && matchesFilter;
   });
 
+  const stationCount = useMemo(() => {
+    const set = new Set<string>();
+    filteredReports.forEach(r => {
+      if (r.pollingUnitId) set.add(r.pollingUnitId);
+    });
+    return Math.max(set.size, Object.keys(KNOWN_STATION_NAMES).length);
+  }, [filteredReports]);
+
   if (!isAdmin && !isSupervisor) {
     return (
       <div className="max-w-md mx-auto p-12 bg-white rounded-3xl border border-gray-100 shadow-sm text-center my-16">
@@ -478,14 +503,14 @@ export default function Reports() {
             <option value="result">Official PU Results</option>
           </select>
 
-          {/* Primary 'Download Reports' Action Button */}
+          {/* Primary 'Download as CSV' Action Button */}
           <button
             onClick={() => setIsDownloadModalOpen(true)}
             className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl shadow-sm text-sm font-bold transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 min-h-[44px]"
-            title="Open Download Reports Center to export structured Incident and Accreditation CSV datasets"
+            title="Download field reports and polling station data as CSV"
           >
             <Download className="w-4 h-4" />
-            <span>Download Reports</span>
+            <span>Download as CSV</span>
             <span className="ml-0.5 px-2 py-0.5 bg-emerald-700/90 rounded-full text-xs font-mono font-bold">
               {filteredReports.length}
             </span>
@@ -509,12 +534,31 @@ export default function Reports() {
                   initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
+                  className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 py-2 z-50 overflow-hidden"
                 >
                   <div className="px-4 py-2 border-b border-gray-50 text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
                     <span>Structured CSV Exports</span>
                     <span className="text-[10px] font-mono text-emerald-600 font-bold">RFC 4180</span>
                   </div>
+
+                  {/* Export Polling Stations Dataset */}
+                  <button
+                    onClick={handleExportPollingStations}
+                    className="w-full px-4 py-2.5 text-left hover:bg-blue-50 text-xs font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-900">Polling Station Data CSV</div>
+                        <div className="text-[10px] text-gray-500">Telemetry, Incidents, Turnout & Results</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
+                      {stationCount}
+                    </span>
+                  </button>
                   
                   {/* Export Incidents Only */}
                   <button
@@ -557,10 +601,10 @@ export default function Reports() {
                   {/* Export Master Dataset */}
                   <button
                     onClick={() => handleExportMaster(false)}
-                    className="w-full px-4 py-2.5 text-left hover:bg-blue-50 text-xs font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors cursor-pointer"
+                    className="w-full px-4 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-gray-700 flex items-center justify-between gap-3 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
                         <Layers className="w-4 h-4" />
                       </div>
                       <div>
@@ -568,7 +612,7 @@ export default function Reports() {
                         <div className="text-[10px] text-gray-500">Unified Incidents, BVAS & Results</div>
                       </div>
                     </div>
-                    <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full">
+                    <span className="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
                       {filteredReports.length}
                     </span>
                   </button>
@@ -611,10 +655,33 @@ export default function Reports() {
         reports={filterType === 'all' ? reports : reports.filter(r => r.type === filterType)}
         selectedStation={searchTerm}
         onSelectStation={(stId) => setSearchTerm(searchTerm === stId ? '' : stId)}
+        onExportCSV={handleExportPollingStations}
       />
 
       {/* Reports Table Card */}
       <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
+        {/* Table Header Bar */}
+        <div className="px-8 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white">
+          <div className="flex items-center gap-3">
+            <h3 className="text-base font-bold text-gray-900">Observation Telemetry Logs</h3>
+            <span className="text-xs font-bold font-mono px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-full">
+              {filteredReports.length} {filteredReports.length === 1 ? 'record' : 'records'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsDownloadModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold transition-all border border-gray-200 cursor-pointer shadow-2xs"
+              title="Download as CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Download as CSV</span>
+            </button>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>

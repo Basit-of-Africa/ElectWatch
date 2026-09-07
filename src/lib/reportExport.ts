@@ -67,6 +67,25 @@ export const STATE_CODE_MAP: Record<string, string> = {
   DT: 'Delta'
 };
 
+export const KNOWN_STATION_NAMES: Record<string, { name: string; lga: string; ward: string; registeredVoters?: number }> = {
+  'PU-OS-01/01/01/001': { name: 'Town Hall Square, Ataoja A', lga: 'Osogbo', ward: 'Ward 01 - Ataoja A', registeredVoters: 750 },
+  'PU-OS-01/01/01/002': { name: 'Community Primary School, Oja Oba', lga: 'Osogbo', ward: 'Ward 01 - Ataoja A', registeredVoters: 920 },
+  'PU-OS-01/02/03/003': { name: 'Baptist High School, Gbonmi', lga: 'Osogbo', ward: 'Ward 02 - Ataoja B', registeredVoters: 680 },
+  'PU-OS-01/03/01/004': { name: 'St. Marks Anglican Primary School', lga: 'Osogbo', ward: 'Ward 03 - Otun Balogun', registeredVoters: 840 },
+  'PU-OS-02/01/02/005': { name: 'Igbonna Market Open Space', lga: 'Olorunda', ward: 'Ward 01 - Akogun', registeredVoters: 890 },
+  'PU-OS-02/02/01/006': { name: 'LA Primary School, Ayetoro', lga: 'Olorunda', ward: 'Ward 02 - Balogun', registeredVoters: 740 },
+  'PU-OS-02/03/04/007': { name: 'Government Technical College', lga: 'Olorunda', ward: 'Ward 03 - Ilie', registeredVoters: 610 },
+  'PU-OS-03/01/01/008': { name: 'Methodist Grammar School, Ilesa', lga: 'Ilesa East', ward: 'Ward 01 - Biladu', registeredVoters: 820 },
+  'PU-OS-03/02/02/009': { name: 'St. Johns School, Iloro', lga: 'Ilesa East', ward: 'Ward 02 - Iloro', registeredVoters: 960 },
+  'PU-OS-03/03/01/010': { name: 'Imo Community Hall', lga: 'Ilesa East', ward: 'Ward 03 - Ijofi', registeredVoters: 590 },
+  'PU-OS-04/01/01/011': { name: 'Ife City Hall, Enuwa', lga: 'Ife Central', ward: 'Ward 01 - Ilode I', registeredVoters: 1100 },
+  'PU-OS-04/02/03/012': { name: 'Oranmiyan Memorial Grammar School', lga: 'Ife Central', ward: 'Ward 02 - Moore', registeredVoters: 870 },
+  'PU-OS-04/03/02/013': { name: 'Urban Day Grammar School, Mayfair', lga: 'Ife Central', ward: 'Ward 03 - Iremo I', registeredVoters: 950 },
+  'PU-OS-05/01/01/014': { name: 'St. Peters Anglican School, Ede', lga: 'Ede South', ward: 'Ward 01 - Abogunde', registeredVoters: 840 },
+  'PU-OS-05/02/02/015': { name: 'Mapo Primary School, Ede', lga: 'Ede South', ward: 'Ward 02 - Alapo', registeredVoters: 760 },
+  'PU-OS-05/03/01/016': { name: 'Timi Agbale Grammar School', lga: 'Ede South', ward: 'Ward 03 - Babasanya', registeredVoters: 690 },
+};
+
 /**
  * Cleanly format and escape strings according to RFC 4180 CSV specifications.
  * Encloses all text in double-quotes and replaces internal quotes with double-quotes.
@@ -488,4 +507,307 @@ export function exportMasterReportsCSV(
 
   triggerCSVDownload(filename, csvContent);
   return { count: filtered.length, filename };
+}
+
+/**
+ * Export 4: Aggregated Polling Station Telemetry & Incident Analysis Dataset
+ * Generates an offline analysis-ready table where each row is a distinct Polling Station,
+ * capturing submission counts, incident severities, voter accreditation numbers, BVAS health,
+ * and Form EC8A vote totals.
+ */
+export function exportPollingStationsCSV(
+  allReports: Report[],
+  options: ExportOptions = {}
+): { count: number; filename: string } {
+  const filtered = filterReportsForExport(allReports, options);
+
+  interface AggregatedStation {
+    id: string;
+    name: string;
+    state: string;
+    lga: string;
+    ward: string;
+    reportsCount: number;
+    accreditationCount: number;
+    incidentCount: number;
+    resultCount: number;
+    bvasAccreditedTotal: number;
+    latestBvasStatus: string;
+    latestQueueSize: string;
+    criticalIncidents: number;
+    highIncidents: number;
+    mediumLowIncidents: number;
+    incidentCategories: Set<string>;
+    incidentStatuses: Set<string>;
+    hasResults: boolean;
+    apcVotes: number;
+    pdpVotes: number;
+    lpVotes: number;
+    nnppVotes: number;
+    otherVotes: number;
+    totalVotes: number;
+    lat: number | null;
+    lng: number | null;
+    observers: Set<string>;
+    firstTimestamp: Date | null;
+    latestTimestamp: Date | null;
+  }
+
+  const stationMap: Record<string, AggregatedStation> = {};
+
+  // First seed baseline stations if in Osun state context
+  Object.entries(KNOWN_STATION_NAMES).forEach(([id, meta]) => {
+    stationMap[id] = {
+      id,
+      name: meta.name,
+      state: 'Osun',
+      lga: meta.lga,
+      ward: meta.ward,
+      reportsCount: 0,
+      accreditationCount: 0,
+      incidentCount: 0,
+      resultCount: 0,
+      bvasAccreditedTotal: 0,
+      latestBvasStatus: 'N/A',
+      latestQueueSize: 'N/A',
+      criticalIncidents: 0,
+      highIncidents: 0,
+      mediumLowIncidents: 0,
+      incidentCategories: new Set(),
+      incidentStatuses: new Set(),
+      hasResults: false,
+      apcVotes: 0,
+      pdpVotes: 0,
+      lpVotes: 0,
+      nnppVotes: 0,
+      otherVotes: 0,
+      totalVotes: 0,
+      lat: null,
+      lng: null,
+      observers: new Set(),
+      firstTimestamp: null,
+      latestTimestamp: null
+    };
+  });
+
+  // Now aggregate all reports
+  filtered.forEach((r) => {
+    const rawId = (r.pollingUnitId || 'Unknown PU').trim();
+    const loc = resolveLocationDetails(r);
+    const date = parseReportDate(r.timestamp);
+    const payload = r.payload || {};
+
+    if (!stationMap[rawId]) {
+      const known = KNOWN_STATION_NAMES[rawId];
+      stationMap[rawId] = {
+        id: rawId,
+        name: known?.name || payload.pollingUnitName || `Polling Station ${rawId}`,
+        state: loc.state,
+        lga: loc.lga,
+        ward: loc.ward,
+        reportsCount: 0,
+        accreditationCount: 0,
+        incidentCount: 0,
+        resultCount: 0,
+        bvasAccreditedTotal: 0,
+        latestBvasStatus: 'N/A',
+        latestQueueSize: 'N/A',
+        criticalIncidents: 0,
+        highIncidents: 0,
+        mediumLowIncidents: 0,
+        incidentCategories: new Set(),
+        incidentStatuses: new Set(),
+        hasResults: false,
+        apcVotes: 0,
+        pdpVotes: 0,
+        lpVotes: 0,
+        nnppVotes: 0,
+        otherVotes: 0,
+        totalVotes: 0,
+        lat: null,
+        lng: null,
+        observers: new Set(),
+        firstTimestamp: null,
+        latestTimestamp: null
+      };
+    }
+
+    const st = stationMap[rawId];
+    st.reportsCount += 1;
+
+    // Record observer
+    if (r.observerId) {
+      const obs = options.observerMap?.[r.observerId];
+      st.observers.add(obs?.displayName || obs?.email || r.observerId);
+    }
+
+    // Record geo coordinates
+    if (r.location?.lat && r.location?.lng) {
+      st.lat = r.location.lat;
+      st.lng = r.location.lng;
+    }
+
+    // Record timestamps
+    if (date) {
+      if (!st.firstTimestamp || date < st.firstTimestamp) {
+        st.firstTimestamp = date;
+      }
+      if (!st.latestTimestamp || date > st.latestTimestamp) {
+        st.latestTimestamp = date;
+      }
+    }
+
+    // Type specific breakdown
+    if (r.type === 'incident') {
+      st.incidentCount += 1;
+      const sev = (payload.severity || 'medium').toLowerCase();
+      if (sev === 'critical') st.criticalIncidents += 1;
+      else if (sev === 'high') st.highIncidents += 1;
+      else st.mediumLowIncidents += 1;
+
+      if (payload.incidentCategory) {
+        const catLabel = INCIDENT_CATEGORY_LABELS[payload.incidentCategory] || payload.incidentCategory;
+        st.incidentCategories.add(catLabel);
+      }
+
+      const incMeta = options.incidentMap?.[r.id];
+      const status = incMeta?.status || payload.status || 'pending';
+      st.incidentStatuses.add(status.toUpperCase());
+    } else if (r.type === 'accreditation') {
+      st.accreditationCount += 1;
+      if (typeof payload.voterCount === 'number' && !isNaN(payload.voterCount)) {
+        st.bvasAccreditedTotal = Math.max(st.bvasAccreditedTotal, payload.voterCount);
+      }
+      if (payload.bvasStatus) {
+        st.latestBvasStatus = BVAS_STATUS_LABELS[payload.bvasStatus] || payload.bvasStatus;
+      }
+      if (payload.queueSize) {
+        st.latestQueueSize = QUEUE_SIZE_LABELS[payload.queueSize] || payload.queueSize;
+      }
+    } else if (r.type === 'result') {
+      st.resultCount += 1;
+      st.hasResults = true;
+      st.apcVotes = payload.apcVotes ?? st.apcVotes;
+      st.pdpVotes = payload.pdpVotes ?? st.pdpVotes;
+      st.lpVotes = payload.lpVotes ?? st.lpVotes;
+      st.nnppVotes = payload.nnppVotes ?? st.nnppVotes;
+      st.otherVotes = payload.otherVotes ?? st.otherVotes;
+      st.totalVotes = payload.totalVotes ?? (payload.apcVotes + payload.pdpVotes + payload.lpVotes + payload.nnppVotes + (payload.otherVotes || 0));
+    }
+  });
+
+  const stationList = Object.values(stationMap);
+
+  const headers = [
+    'Polling Unit Code / ID',
+    'Polling Unit Name',
+    'State',
+    'LGA',
+    'Ward',
+    'Total Telemetry Reports',
+    'Accreditation Reports Count',
+    'BVAS Peak Accredited Voters',
+    'Latest BVAS Machine Status',
+    'Latest Voter Queue Condition',
+    'Total Incidents Flagged',
+    'Critical Incidents Count',
+    'High Incidents Count',
+    'Medium/Low Incidents Count',
+    'Reported Incident Categories',
+    'Incident Investigation Statuses',
+    'Official Form EC8A Results Received',
+    'APC Votes',
+    'PDP Votes',
+    'LP Votes',
+    'NNPP Votes',
+    'Other Parties Votes',
+    'Total Valid Votes',
+    'Leading / Winner Party',
+    'Operational Security Status',
+    'Latitude',
+    'Longitude',
+    'Assigned Active Observers Count',
+    'Observer Personnel',
+    'First Telemetry Timestamp (WAT)',
+    'Latest Telemetry Timestamp (WAT)',
+    'First Telemetry Timestamp (UTC)',
+    'Latest Telemetry Timestamp (UTC)'
+  ];
+
+  const rows = stationList.map((st) => {
+    // Determine winner/leading party
+    let leadingParty = 'N/A';
+    if (st.hasResults && st.totalVotes > 0) {
+      const tallies = [
+        { party: 'APC', votes: st.apcVotes },
+        { party: 'PDP', votes: st.pdpVotes },
+        { party: 'LP', votes: st.lpVotes },
+        { party: 'NNPP', votes: st.nnppVotes },
+      ];
+      tallies.sort((a, b) => b.votes - a.votes);
+      if (tallies[0].votes > 0) {
+        leadingParty = `${tallies[0].party} (${tallies[0].votes} votes)`;
+      }
+    }
+
+    // Operational risk classification
+    let operationalStatus = 'NORMAL - Active Observation';
+    if (st.criticalIncidents > 0 || st.incidentCount >= 2) {
+      operationalStatus = 'CRITICAL ALERT - Severe Electoral Irregularities';
+    } else if (st.incidentCount > 0) {
+      operationalStatus = 'ELEVATED - Incident Under Investigation';
+    } else if (st.reportsCount === 0) {
+      operationalStatus = 'AWAITING TELEMETRY - Baseline Station';
+    } else if (st.hasResults) {
+      operationalStatus = 'RESOLVED - Official PU Results Logged';
+    }
+
+    const firstTimeWat = st.firstTimestamp ? formatReportTimestamps(st.firstTimestamp).wat : 'N/A';
+    const latestTimeWat = st.latestTimestamp ? formatReportTimestamps(st.latestTimestamp).wat : 'N/A';
+    const firstTimeUtc = st.firstTimestamp ? formatReportTimestamps(st.firstTimestamp).utc : 'N/A';
+    const latestTimeUtc = st.latestTimestamp ? formatReportTimestamps(st.latestTimestamp).utc : 'N/A';
+
+    return [
+      formatCSVCell(st.id),
+      formatCSVCell(st.name),
+      formatCSVCell(st.state),
+      formatCSVCell(st.lga),
+      formatCSVCell(st.ward),
+      formatCSVNumber(st.reportsCount),
+      formatCSVNumber(st.accreditationCount),
+      formatCSVNumber(st.bvasAccreditedTotal),
+      formatCSVCell(st.latestBvasStatus),
+      formatCSVCell(st.latestQueueSize),
+      formatCSVNumber(st.incidentCount),
+      formatCSVNumber(st.criticalIncidents),
+      formatCSVNumber(st.highIncidents),
+      formatCSVNumber(st.mediumLowIncidents),
+      formatCSVCell(Array.from(st.incidentCategories).join('; ') || 'None'),
+      formatCSVCell(Array.from(st.incidentStatuses).join(', ') || 'None'),
+      formatCSVCell(st.hasResults ? 'YES' : 'NO'),
+      formatCSVNumber(st.hasResults ? st.apcVotes : ''),
+      formatCSVNumber(st.hasResults ? st.pdpVotes : ''),
+      formatCSVNumber(st.hasResults ? st.lpVotes : ''),
+      formatCSVNumber(st.hasResults ? st.nnppVotes : ''),
+      formatCSVNumber(st.hasResults ? st.otherVotes : ''),
+      formatCSVNumber(st.hasResults ? st.totalVotes : ''),
+      formatCSVCell(leadingParty),
+      formatCSVCell(operationalStatus),
+      formatCSVCell(st.lat ?? ''),
+      formatCSVCell(st.lng ?? ''),
+      formatCSVNumber(st.observers.size),
+      formatCSVCell(Array.from(st.observers).join('; ') || 'Unassigned'),
+      formatCSVCell(firstTimeWat),
+      formatCSVCell(latestTimeWat),
+      formatCSVCell(firstTimeUtc),
+      formatCSVCell(latestTimeUtc)
+    ].join(',');
+  });
+
+  const csvContent = [headers.join(','), ...rows].join('\r\n');
+  const timestampStr = format(new Date(), 'yyyyMMdd_HHmm');
+  const filename = `${options.customFilenamePrefix || 'ivote_polling_stations_dataset'}_${timestampStr}.csv`;
+
+  triggerCSVDownload(filename, csvContent);
+  return { count: stationList.length, filename };
 }
