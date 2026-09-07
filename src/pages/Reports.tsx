@@ -44,6 +44,7 @@ import {
   IncidentMeta
 } from '../lib/reportExport';
 import DownloadReportsModal from '../components/DownloadReportsModal';
+import ReportsByPollingStationChart from '../components/ReportsByPollingStationChart';
 
 export default function Reports() {
   const { user, isAdmin, isSupervisor } = useAuth();
@@ -604,6 +605,13 @@ export default function Reports() {
           </div>
         </div>
       </div>
+
+      {/* Interactive Recharts Distribution by Polling Station Chart */}
+      <ReportsByPollingStationChart
+        reports={filterType === 'all' ? reports : reports.filter(r => r.type === filterType)}
+        selectedStation={searchTerm}
+        onSelectStation={(stId) => setSearchTerm(searchTerm === stId ? '' : stId)}
+      />
 
       {/* Reports Table Card */}
       <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
