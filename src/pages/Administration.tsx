@@ -25,6 +25,7 @@ import DownloadReportsModal from '../components/DownloadReportsModal';
 import DirectiveBroadcastModal from '../components/DirectiveBroadcastModal';
 import RoleUpgradeModal from '../components/RoleUpgradeModal';
 import PushNotificationPrompt from '../components/PushNotificationPrompt';
+import SystemHealthMonitor from '../components/SystemHealthMonitor';
 import { collection, onSnapshot, query, limit, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User, Report, AuditLogEntry } from '../types';
@@ -139,7 +140,7 @@ export default function Administration() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Users</span>
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Accredited Users</span>
             <Users className="w-4 h-4 text-gray-400" />
           </div>
           <p className="text-2xl font-bold text-gray-900 font-serif">{users.length}</p>
@@ -154,13 +155,13 @@ export default function Administration() {
 
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Firestore Telemetry</span>
-            <Database className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ingested Incident Reports</span>
+            <FileText className="w-4 h-4 text-emerald-600" />
           </div>
-          <p className="text-2xl font-bold text-emerald-700 font-serif">Real-Time</p>
+          <p className="text-2xl font-bold text-emerald-700 font-serif">{reports.length}</p>
           <p className="text-[11px] text-emerald-600 font-semibold mt-2 flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Encrypted socket active</span>
+            <span>Field observations synchronized</span>
           </p>
         </div>
 
@@ -182,13 +183,20 @@ export default function Administration() {
 
         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Offline Cache</span>
-            <HardDrive className="w-4 h-4 text-amber-600" />
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Station Security Clearance</span>
+            <Lock className="w-4 h-4 text-purple-600" />
           </div>
-          <p className="text-2xl font-bold text-gray-900 font-serif">IndexedDB</p>
-          <p className="text-[11px] text-gray-400 mt-2">Zero loss fallback operational</p>
+          <p className="text-2xl font-bold text-purple-900 font-serif">
+            {isAdmin ? 'System Admin' : 'Supervisor'}
+          </p>
+          <p className="text-[11px] text-gray-500 mt-2 truncate" title={user?.email || ''}>
+            {user?.email || 'HQ Active Station'}
+          </p>
         </div>
       </div>
+
+      {/* Real-time System Health Monitor (Firestore, Firebase Auth, Gemini API & Network Gateway) */}
+      <SystemHealthMonitor />
 
       {/* Structured Admin Panels Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
