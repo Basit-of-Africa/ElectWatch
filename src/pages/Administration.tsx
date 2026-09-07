@@ -24,6 +24,7 @@ import AuditTrailModal from '../components/AuditTrailModal';
 import DownloadReportsModal from '../components/DownloadReportsModal';
 import DirectiveBroadcastModal from '../components/DirectiveBroadcastModal';
 import RoleUpgradeModal from '../components/RoleUpgradeModal';
+import PushNotificationPrompt from '../components/PushNotificationPrompt';
 import { collection, onSnapshot, query, limit, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User, Report, AuditLogEntry } from '../types';
@@ -111,6 +112,8 @@ export default function Administration() {
         }
         actions={
           <div className="flex items-center gap-2 flex-wrap">
+            <PushNotificationPrompt compact />
+
             <button
               type="button"
               onClick={() => setShowBroadcastModal(true)}
@@ -286,6 +289,9 @@ export default function Administration() {
                   Dispatch
                 </button>
               </div>
+
+              {/* Web Push Emergency Declarations & Device Alert Controls */}
+              <PushNotificationPrompt variant="card" />
 
               <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-100 flex items-start justify-between gap-3">
                 <div>

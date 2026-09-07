@@ -11,7 +11,6 @@ import ActiveDirectivesBanner from './ActiveDirectivesBanner';
 import InstallPWABanner, { InstallPWAButton } from './InstallPWA';
 import ElectionScopeSelector from './ElectionScopeSelector';
 import ObserverOnboarding from './ObserverOnboarding';
-import PushNotificationPrompt from './PushNotificationPrompt';
 import ObserverFAB from './ObserverFAB';
 import { 
   LayoutGrid, 
@@ -356,7 +355,6 @@ export default function Layout() {
                <span>Code of Conduct</span>
              </button>
              <ElectionScopeSelector compact />
-             <PushNotificationPrompt compact />
              <DangerButton variant="header" />
              <div className="h-8 w-px bg-gray-100 mx-1" />
              <NotificationCenter />

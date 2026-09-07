@@ -24,15 +24,19 @@ import { toast } from 'sonner';
 
 interface PushNotificationPromptProps {
   compact?: boolean;
+  variant?: 'compact' | 'banner' | 'card';
   className?: string;
   onStatusChange?: (granted: boolean) => void;
 }
 
 export default function PushNotificationPrompt({ 
   compact = false, 
+  variant,
   className = '',
   onStatusChange 
 }: PushNotificationPromptProps) {
+  const isCard = variant === 'card';
+  const isCompact = variant === 'compact' || compact;
   const { user } = useAuth();
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [isRequesting, setIsRequesting] = useState(false);
@@ -97,6 +101,65 @@ export default function PushNotificationPrompt({
     localStorage.setItem('push_prompt_dismissed_v1', 'true');
   };
 
+  // Administrative Card Variant (for Administration Page HQ Situation Room Controls)
+  if (isCard) {
+    const isGranted = permission === 'granted';
+    return (
+      <div className={`p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+        isGranted 
+          ? 'bg-emerald-50/70 border-emerald-200/80' 
+          : 'bg-amber-50/70 border-amber-200/80'
+      } ${className}`}>
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-bold text-gray-950 font-serif">
+              Web Push Emergency Declarations
+            </h4>
+            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+              isGranted
+                ? 'bg-emerald-200 text-emerald-900'
+                : permission === 'unsupported'
+                ? 'bg-gray-200 text-gray-700'
+                : 'bg-amber-200 text-amber-900'
+            }`}>
+              {isGranted ? 'Active' : permission === 'unsupported' ? 'Unsupported' : 'Ready to Enable'}
+            </span>
+          </div>
+          <p className="text-[11px] text-gray-600 leading-relaxed max-w-md">
+            {isGranted
+              ? 'Station browser registered for instant OS sound alarms and lockscreen alerts during emergency directives.'
+              : 'Subscribe this station browser to receive immediate OS alerts during evacuation or security events.'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {isGranted ? (
+            <button
+              type="button"
+              onClick={handleTestAlert}
+              disabled={isTesting}
+              title="Dispatch a sample priority push notification to this device"
+              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer shadow-2xs transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              <BellRing className="w-3.5 h-3.5" />
+              <span>{isTesting ? 'Sending Alert...' : 'Test Emergency Alert'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleEnablePush}
+              disabled={isRequesting || permission === 'unsupported'}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer shadow-2xs transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              <BellRing className="w-3.5 h-3.5 animate-bounce" />
+              <span>{isRequesting ? 'Activating...' : 'Enable Emergency Push'}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // If unsupported or already granted in compact mode, render status pill
   if (permission === 'granted') {
     return (
@@ -118,12 +181,12 @@ export default function PushNotificationPrompt({
     );
   }
 
-  if (permission === 'unsupported' || (isDismissed && !compact)) {
+  if (permission === 'unsupported' || (isDismissed && !isCompact)) {
     return null;
   }
 
   // Compact Pill for Top Bar / Header
-  if (compact) {
+  if (isCompact) {
     return (
       <button
         onClick={handleEnablePush}
