@@ -13,11 +13,13 @@ import { useAuth } from '../../context/AuthContext';
 interface QuickActionsProps {
   onCheckInClick?: () => void;
   onCheckIn?: () => void;
+  density?: 'comfortable' | 'compact';
 }
 
-export default function QuickActions({ onCheckInClick, onCheckIn }: QuickActionsProps) {
+export default function QuickActions({ onCheckInClick, onCheckIn, density = 'comfortable' }: QuickActionsProps) {
   const { isAdmin, isSupervisor } = useAuth();
   const handleCheckIn = onCheckInClick || onCheckIn;
+  const isCompact = density === 'compact';
 
   const actions = [
     {
@@ -77,8 +79,10 @@ export default function QuickActions({ onCheckInClick, onCheckIn }: QuickActions
   ];
 
   return (
-    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs">
-      <div className="flex items-center justify-between mb-3.5">
+    <div className={`bg-white rounded-2xl border border-gray-200 shadow-xs transition-all ${
+      isCompact ? 'p-3.5 sm:p-4' : 'p-4 sm:p-5'
+    }`}>
+      <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 font-serif">
             Quick Operational Actions
@@ -87,14 +91,18 @@ export default function QuickActions({ onCheckInClick, onCheckIn }: QuickActions
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${isCompact ? 'gap-2.5' : 'gap-3'}`}>
         {actions.map((action, idx) => {
           const Icon = action.icon;
           const cardContent = (
-            <div className={`p-4 rounded-xl border transition-all duration-150 flex flex-col justify-between h-full group cursor-pointer ${action.bgColor}`}>
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${action.iconColor}`}>
-                  <Icon className="w-5 h-5" />
+            <div className={`rounded-xl border transition-all duration-150 flex flex-col justify-between h-full group cursor-pointer ${action.bgColor} ${
+              isCompact ? 'p-3' : 'p-3.5 sm:p-4'
+            }`}>
+              <div className="flex items-start justify-between gap-2 mb-2.5">
+                <div className={`rounded-lg flex items-center justify-center shrink-0 ${action.iconColor} ${
+                  isCompact ? 'w-8 h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
+                }`}>
+                  <Icon className={isCompact ? 'w-4 h-4' : 'w-4 h-4 sm:w-5 sm:h-5'} />
                 </div>
                 {action.badge && (
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/80 border border-black/5 shadow-2xs">
@@ -108,7 +116,7 @@ export default function QuickActions({ onCheckInClick, onCheckIn }: QuickActions
                   <h3 className="text-xs font-bold tracking-tight">{action.title}</h3>
                   <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                 </div>
-                <p className="text-[11px] opacity-80 mt-1 line-clamp-2 leading-relaxed">
+                <p className="text-[11px] opacity-80 mt-0.5 line-clamp-2 leading-relaxed">
                   {action.description}
                 </p>
               </div>

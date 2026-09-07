@@ -368,7 +368,7 @@ export default function Layout() {
         <FirstTimeLocationPrompt />
         <InstallPWABanner />
 
-        <div className="p-6 md:p-10 lg:p-12 max-w-7xl mx-auto w-full space-y-6">
+        <div className="p-4 sm:p-6 md:p-8 lg:p-8 2xl:p-10 max-w-7xl 2xl:max-w-[1536px] mx-auto w-full space-y-6">
           <ActiveDirectivesBanner />
           <Outlet />
         </div>

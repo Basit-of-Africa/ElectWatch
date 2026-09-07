@@ -31,7 +31,8 @@ import {
   Activity, 
   ShieldCheck,
   AlertCircle,
-  CirclePlus
+  CirclePlus,
+  SlidersHorizontal
 } from 'lucide-react';
 import { formatDistanceToNow, format, subDays, isSameDay } from 'date-fns';
 import { motion } from 'motion/react';
@@ -68,6 +69,20 @@ export default function Dashboard() {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Dashboard Information Density ('comfortable' vs 'compact')
+  const [density, setDensity] = useState<'comfortable' | 'compact'>(() => {
+    return (localStorage.getItem('dashboard_density') as 'comfortable' | 'compact') || 'comfortable';
+  });
+
+  const handleDensityChange = (newDensity: 'comfortable' | 'compact') => {
+    setDensity(newDensity);
+    localStorage.setItem('dashboard_density', newDensity);
+    toast.success(newDensity === 'compact' ? 'Compact density enabled (90% view)' : 'Comfortable density restored', {
+      description: newDensity === 'compact' ? 'Higher information density optimized for laptop command centers' : 'Standard spacious layout restored',
+      duration: 2000
+    });
+  };
 
   // Synchronize Election Telemetry
   const refreshElectionStatistics = async (isManual = false) => {
@@ -321,9 +336,13 @@ export default function Dashboard() {
   const isCurrentUserCheckedIn = currentUserRecord?.checkInStatus === 'checked_in';
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className={`w-full max-w-7xl 2xl:max-w-[1536px] mx-auto pb-12 transition-all ${
+      density === 'compact' ? 'space-y-4 sm:space-y-5' : 'space-y-6'
+    }`}>
       {/* 1. Concise Page Header with Election Context & Synchronization Controls */}
-      <div className="pb-6 border-b border-gray-200/80 mb-6 sm:mb-8">
+      <div className={`border-b border-gray-200/80 transition-all ${
+        density === 'compact' ? 'pb-4 mb-4 sm:mb-6' : 'pb-6 mb-6 sm:mb-8'
+      }`}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3 flex-wrap">
@@ -340,7 +359,35 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0 flex-wrap">
-            <div className="flex items-center gap-2.5">
+            {/* Information Density Switcher */}
+            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200 text-xs font-semibold shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleDensityChange('comfortable')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  density === 'comfortable' 
+                    ? 'bg-white text-gray-900 shadow-xs font-bold' 
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+                title="Comfortable Spacing (Default)"
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDensityChange('compact')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  density === 'compact' 
+                    ? 'bg-emerald-600 text-white shadow-xs font-bold' 
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+                title="Compact Mode - Matches 90% zoom viewport comfort on laptop displays"
+              >
+                Compact (90%)
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => refreshElectionStatistics(true)}
@@ -379,28 +426,30 @@ export default function Dashboard() {
       </div>
 
       {/* Operational Field Actions */}
-      <div className="bg-slate-900 text-white rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">Operational Field Actions</span>
-            <h3 className="text-base sm:text-lg font-bold font-serif text-white">Primary Workflow Triggers</h3>
-            <p className="text-xs text-slate-300 max-w-xl">High-priority tools for rapid incident filing, voter accreditation audits, polling station mapping, and observer rosters.</p>
+      <div className={`bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-xs transition-all ${
+        density === 'compact' ? 'p-3.5 sm:p-4' : 'p-4 sm:p-5'
+      }`}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+          <div className="space-y-0.5">
+            <span className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">Operational Field Actions</span>
+            <h3 className="text-sm sm:text-base font-bold font-serif text-white">Primary Workflow Triggers</h3>
+            <p className="text-xs text-slate-300 max-w-xl leading-relaxed">High-priority tools for rapid incident filing, voter accreditation audits, and polling station mapping.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <Link className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-colors" to="/report">
-              <CirclePlus className="w-4 h-4" aria-hidden="true" />
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Link className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-colors" to="/report">
+              <CirclePlus className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Submit Report</span>
             </Link>
-            <Link className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-xs transition-colors" to="/report?type=incident">
-              <ShieldAlert className="w-4 h-4" aria-hidden="true" />
+            <Link className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow-xs transition-colors" to="/report?type=incident">
+              <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Report Incident</span>
             </Link>
-            <Link className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors" to="/polling-stations">
-              <Building2 className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+            <Link className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors" to="/polling-stations">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
               <span>Polling Stations</span>
             </Link>
-            <Link className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors" to="/observers">
-              <Users className="w-4 h-4 text-blue-400" aria-hidden="true" />
+            <Link className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors" to="/observers">
+              <Users className="w-3.5 h-3.5 text-blue-400" aria-hidden="true" />
               <span>Manage Observers</span>
             </Link>
           </div>
@@ -410,7 +459,9 @@ export default function Dashboard() {
       {/* 2. Key Monitoring Statistics: 6 Exact Metrics in a Calm, Structured Grid */}
       <section aria-labelledby="key-statistics-heading">
         <h2 id="key-statistics-heading" className="sr-only">Key Monitoring Statistics</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className={`grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 ${
+          density === 'compact' ? 'gap-2.5 sm:gap-3' : 'gap-3 sm:gap-3.5'
+        }`}>
           <StatCard
             id="stat-active-observers"
             title="Active Observers"
@@ -418,6 +469,7 @@ export default function Dashboard() {
             icon={Users}
             variant="emerald"
             description="Field personnel on duty"
+            density={density}
           />
           <StatCard
             id="stat-stations-covered"
@@ -426,6 +478,7 @@ export default function Dashboard() {
             icon={Building2}
             variant="blue"
             description="Active reporting units"
+            density={density}
           />
           <StatCard
             id="stat-reports-submitted"
@@ -434,6 +487,7 @@ export default function Dashboard() {
             icon={FileText}
             variant="purple"
             description="Accreditation & results"
+            density={density}
           />
           <StatCard
             id="stat-reports-awaiting-review"
@@ -442,6 +496,7 @@ export default function Dashboard() {
             icon={Clock}
             variant="amber"
             description="Pending verification"
+            density={density}
           />
           <StatCard
             id="stat-open-incidents"
@@ -450,6 +505,7 @@ export default function Dashboard() {
             icon={AlertTriangle}
             variant="rose"
             description="Requires action"
+            density={density}
           />
           <StatCard
             id="stat-verified-reports"
@@ -458,6 +514,7 @@ export default function Dashboard() {
             icon={CheckCircle2}
             variant="teal"
             description="Audited & certified"
+            density={density}
           />
         </div>
       </section>
@@ -474,14 +531,15 @@ export default function Dashboard() {
 
       {/* 5. Prominent Quick-Actions Area */}
       <QuickActions
+        density={density}
         onCheckIn={!isCurrentUserCheckedIn ? () => {
           const el = document.getElementById('observer-checkin-section');
           if (el) el.scrollIntoView({ behavior: 'smooth' });
         } : undefined}
       />
 
-      {/* 5. Structured Administrative 2-Column Information Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* 6. Structured Administrative 2-Column Information Layout */}
+      <div className={`grid grid-cols-1 lg:grid-cols-12 ${density === 'compact' ? 'gap-4 sm:gap-5' : 'gap-6'} items-start`}>
         {/* Left Column: Incident Summary & Observer Attendance (7 cols on lg) */}
         <div className="lg:col-span-7 space-y-6">
           
